@@ -24,7 +24,7 @@ export interface StoredSession {
   compositeScore?: number;
 }
 
-interface StorytellerDB extends DBSchema {
+interface VireoDB extends DBSchema {
   stories: {
     key: string;
     value: Story;
@@ -47,14 +47,14 @@ interface StorytellerDB extends DBSchema {
   };
 }
 
-const DB_NAME = 'storyteller_db';
+const DB_NAME = 'vireo_db';
 const DB_VERSION = 1;
 
-let dbPromise: Promise<IDBPDatabase<StorytellerDB>> | null = null;
+let dbPromise: Promise<IDBPDatabase<VireoDB>> | null = null;
 
 function getDB() {
   if (!dbPromise) {
-    dbPromise = openDB<StorytellerDB>(DB_NAME, DB_VERSION, {
+    dbPromise = openDB<VireoDB>(DB_NAME, DB_VERSION, {
       upgrade(db) {
         if (!db.objectStoreNames.contains('stories')) {
           const storyStore = db.createObjectStore('stories', { keyPath: 'id' });

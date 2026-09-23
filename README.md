@@ -1,6 +1,9 @@
-# 🎙️ Storyteller — AI Speech & Delivery Coach
+# 🎙️ Vireo — AI Speech & Delivery Coach
 
-**Storyteller** is a real-time AI speech and delivery coach powered by the **Google Gemini Live API** (Multimodal WebSockets for live video, audio PCM, and real-time speech analysis) and **Gemini 3.6 Flash** (for comprehensive post-speech teardown reports).
+**Vireo** is a real-time AI speech and delivery coach powered by the **Google Gemini Live API** (Multimodal WebSockets for live video, audio PCM, and real-time speech analysis) and **Gemini 3.6 Flash** (for comprehensive post-speech teardown reports).
+
+> 🐦 **Why "Vireo"?**
+> Named after the North American songbird known for its clear, melodious, and persistent singing. **Vireo** symbolizes articulate, confident, and engaging speech — empowering speakers to master their vocal delivery, cadence, and storytelling.
 
 ---
 
@@ -81,7 +84,7 @@ Open [`http://localhost:5173`](http://localhost:5173) in your browser, allow cam
 ## 🏗️ Project Architecture
 
 ```
-storyteller/
+vireo/
 ├── server/                   # Node.js WebSocket & Express Backend
 │   ├── index.js              # Server entry point, Gemini Live WSS proxy & teardown endpoint
 │   ├── prompts/              # Teardown & coaching system prompts

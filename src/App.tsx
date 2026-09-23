@@ -313,11 +313,14 @@ export const App: React.FC = () => {
             </button>
 
             <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-600 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-cyan-500/20 ring-1 ring-white/20">
-              S
+              V
             </div>
             <div>
-              <span className="font-extrabold text-white text-base tracking-tight flex items-center gap-2">
-                Storyteller
+              <span
+                title="Vireo: Named after the North American songbird known for its clear, melodious, and persistent singing — symbolizing articulate, confident speech."
+                className="font-extrabold text-white text-base tracking-tight flex items-center gap-2 cursor-help"
+              >
+                Vireo 🐦
                 <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
                   Live AI Coach
                 </span>
@@ -407,7 +410,7 @@ export const App: React.FC = () => {
 
             <div className="space-y-3 text-xs">
               <p className="text-slate-300">
-                Storyteller uses the Google Gemini API for live speech coaching and detailed teardown reports.
+                Vireo uses the Google Gemini API for live speech coaching and detailed teardown reports.
               </p>
 
               <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
@@ -529,7 +532,7 @@ export const App: React.FC = () => {
                           </button>
                         </div>
                         <p className="text-[11px] text-slate-300">
-                          Active voice coach rep mode. Storyteller actively monitors speech pace (&gt;180 WPM), filler word stacks (≥5 per 30s), and buried points, interrupting with live Puck audio feedback when thresholds are breached.
+                          Active voice coach rep mode. Vireo actively monitors speech pace (&gt;180 WPM), filler word stacks (≥5 per 30s), and buried points, interrupting with live Puck audio feedback when thresholds are breached.
                         </p>
                       </div>
                     )}
@@ -570,7 +573,7 @@ export const App: React.FC = () => {
                           </button>
                         </div>
                         <p className="text-[11px] text-slate-300">
-                          Silent ambient coach for real presentations. Storyteller transcribes and logs metrics on screen silently without generating any conversational audio output during your talk.
+                          Silent ambient coach for real presentations. Vireo transcribes and logs metrics on screen silently without generating any conversational audio output during your talk.
                         </p>
                       </div>
                     )}

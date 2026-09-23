@@ -232,7 +232,7 @@ wss.on('connection', (clientWs, req) => {
 
       if (mode === 'live') {
         // Live Mode: Silent coach
-        systemPromptText = "You are Storyteller, silent speech coach. Observe the talk and output transcript only. Do not generate conversational audio responses.";
+        systemPromptText = "You are Vireo, silent speech coach. Observe the talk and output transcript only. Do not generate conversational audio responses.";
       } else {
         // Rehearsal Mode: Active voice coach
         systemPromptText = "You are running a rehearsal with Mano. Camera and mic are on. You may interrupt when he buries point, abstracts, or exceeds 180 WPM.";
@@ -363,7 +363,7 @@ wss.on('connection', (clientWs, req) => {
 
 server.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(` Storyteller Node Server running on http://localhost:${PORT}`);
+  console.log(` Vireo Node Server running on http://localhost:${PORT}`);
   console.log(` WebSocket Server mounted at ws://localhost:${PORT}/ws/live`);
   console.log(`====================================================`);
 });

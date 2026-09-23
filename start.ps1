@@ -1,9 +1,9 @@
-# Storyteller PowerShell 1-Click Launcher
+# Vireo PowerShell 1-Click Launcher
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
 
 Write-Host "===================================================" -ForegroundColor Cyan
-Write-Host "  Storyteller — AI Speech Coach (1-Click Launcher)" -ForegroundColor Cyan
+Write-Host "  Vireo — AI Speech Coach (1-Click Launcher)" -ForegroundColor Cyan
 Write-Host "===================================================" -ForegroundColor Cyan
 Write-Host ""
 

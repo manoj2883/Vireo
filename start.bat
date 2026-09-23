@@ -1,7 +1,7 @@
 @echo off
-title Storyteller — AI Speech Coach Launcher
+title Vireo — AI Speech Coach Launcher
 echo ===================================================
-echo   Storyteller — AI Speech Coach (1-Click Launcher)
+echo   Vireo — AI Speech Coach (1-Click Launcher)
 echo ===================================================
 echo.
 

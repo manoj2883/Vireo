@@ -115,7 +115,7 @@ export const Milestone1PipeTester: React.FC = () => {
       <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-white">Storyteller</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-white">Vireo</h1>
             <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
               Milestone 1 Verification
             </span>
