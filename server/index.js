@@ -4,27 +4,56 @@ import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { TEARDOWN_PROMPT } from './prompts/teardown.js';
 
 dotenv.config();
 
-const PORT = process.env.PORT || 3001;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const PORT = process.env.PORT || 8000;
+const HOST = '0.0.0.0';
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
-// FIX 7: Rename to validSessionTokens and require token authentication
+// Session Tokens & IP Rate Limiting
 const validSessionTokens = new Set();
+const ipRequestLogs = new Map();
+const MAX_SESSIONS_PER_IP_PER_HOUR = 20;
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const hourAgo = now - 3600 * 1000;
+  let timestamps = ipRequestLogs.get(ip) || [];
+  timestamps = timestamps.filter((t) => t > hourAgo);
+  if (timestamps.length >= MAX_SESSIONS_PER_IP_PER_HOUR) {
+    return true;
+  }
+  timestamps.push(now);
+  ipRequestLogs.set(ip, timestamps);
+  return false;
+}
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
-// FIX 7: Session Token Endpoint (Renamed from /api/token to /api/session-token)
+// Session Token Endpoint
 app.post('/api/session-token', (req, res) => {
+  const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
+  if (isRateLimited(clientIp)) {
+    console.warn(`[Server Auth] Rate limit exceeded for IP: ${clientIp}`);
+    return res.status(429).json({
+      error: 'Too many session requests. Maximum 20 sessions per hour permitted.'
+    });
+  }
+
   const apiKeyPresent = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '');
   if (!apiKeyPresent) {
     return res.status(500).json({
-      error: 'GEMINI_API_KEY is not configured on the server. Please set it in .env file.'
+      error: 'GEMINI_API_KEY is not configured on the server. Please set it in environment variables.'
     });
   }
 
@@ -53,7 +82,7 @@ app.post('/api/token', (req, res) => {
   res.json({ token: sessionToken, sessionToken, expiresIn: 3600 });
 });
 
-// FIX 8 & 4: Teardown Endpoint using standard Gemini Pro-tier model with transcript quote validation
+// Teardown Endpoint
 app.post('/api/teardown', async (req, res) => {
   console.log('[Server /api/teardown] Request received.');
 
@@ -64,7 +93,6 @@ app.post('/api/teardown', async (req, res) => {
   try {
     const { sessionId, durationSec, mode, transcript, metrics, flatStretches, stories } = req.body;
 
-    // FIX 8: Count total words across transcript turns
     const allWords = (transcript || [])
       .map((t) => t.text || '')
       .join(' ')
@@ -72,7 +100,6 @@ app.post('/api/teardown', async (req, res) => {
       .split(/\s+/)
       .filter(Boolean);
 
-    // FIX 8: Return HTTP 400 if transcript is empty or shorter than 20 words
     if (!transcript || transcript.length === 0 || allWords.length < 20) {
       console.warn(`[Server /api/teardown] Rejecting short transcript (${allWords.length} words).`);
       return res.status(400).json({
@@ -80,7 +107,6 @@ app.post('/api/teardown', async (req, res) => {
       });
     }
 
-    // Format transcript into timestamped turns: [mm:ss] Speaker: "text"
     const formattedTranscript = (transcript || []).map((t) => {
       const sec = t.timestampSec || 0;
       const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -134,7 +160,6 @@ Flat-Stretch Drop-Off Windows: ${JSON.stringify(flatStretches || [])}
 Relevant Story Bank Entries: ${JSON.stringify(stories || [])}
 `;
 
-    // FIX 4: Use current Gemini Pro-tier text model (gemini-2.0-flash)
     console.log('[Server /api/teardown] Calling Gemini 3.6 Flash text model...');
     const response = await ai.models.generateContent({
       model: 'gemini-3.6-flash',
@@ -148,7 +173,6 @@ Relevant Story Bank Entries: ${JSON.stringify(stories || [])}
     rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
     const teardownData = JSON.parse(rawText);
 
-    // FIX 8: Validate evidenceQuotes against actual transcript
     const unverifiedScores = [];
     const cleanTranscript = formattedTranscript.toLowerCase();
 
@@ -182,6 +206,7 @@ Relevant Story Bank Entries: ${JSON.stringify(stories || [])}
   }
 });
 
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -190,8 +215,23 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// Serve static build files from dist
+const distPath = path.resolve(__dirname, '../dist');
+app.use(express.static(distPath));
+
+// SPA Fallback: Serve index.html for non-API, non-WebSocket GET requests
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/ws')) {
+    return next();
+  }
+  res.sendFile(path.join(distPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(404).send('Vireo production build (dist/index.html) not found. Run npm run build first.');
+    }
+  });
+});
+
 const server = createServer(app);
-// FIX 1: Mount WebSocket server on /ws/live
 const wss = new WebSocketServer({ server, path: '/ws/live' });
 
 wss.on('connection', (clientWs, req) => {
@@ -199,7 +239,7 @@ wss.on('connection', (clientWs, req) => {
   const token = urlParams.get('token');
   const mode = urlParams.get('mode') || 'rehearsal';
 
-  // FIX 7: Auth validation - REJECT if token is missing or invalid
+  // Auth validation - REJECT if token is missing or invalid
   if (!token || !validSessionTokens.has(token)) {
     console.warn('[WS Server Auth] Rejected missing or invalid session token:', token);
     clientWs.send(JSON.stringify({ type: 'error', message: 'Missing or invalid session token' }));
@@ -207,14 +247,24 @@ wss.on('connection', (clientWs, req) => {
     return;
   }
 
+  // Enforce 10-minute maximum session duration cap
+  const MAX_SESSION_DURATION_MS = 10 * 60 * 1000;
+  const sessionDurationTimer = setTimeout(() => {
+    console.log('[WS Server] Enforcing maximum 10-minute session duration limit.');
+    if (clientWs.readyState === WebSocket.OPEN) {
+      clientWs.send(JSON.stringify({ type: 'error', message: 'Maximum 10-minute session duration limit reached.' }));
+      clientWs.close(1000, 'Max duration reached');
+    }
+  }, MAX_SESSION_DURATION_MS);
+
   const apiKey = GEMINI_API_KEY;
   if (!apiKey) {
     clientWs.send(JSON.stringify({ type: 'error', message: 'GEMINI_API_KEY not configured on server' }));
     clientWs.close(4002, 'API key missing');
+    clearTimeout(sessionDurationTimer);
     return;
   }
 
-  // FIX 4: Use supported Gemini Live API model (gemini-2.5-flash-native-audio-latest)
   const geminiModel = 'models/gemini-2.5-flash-native-audio-latest';
   const geminiWsUrl = `wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContent?key=${apiKey}`;
 
@@ -226,15 +276,12 @@ wss.on('connection', (clientWs, req) => {
     geminiWs = new WebSocket(geminiWsUrl);
 
     geminiWs.on('open', () => {
-      // FIX 9: Server-Enforced Silent Live Mode vs Rehearsal Mode
       let responseModalities = ["AUDIO"];
       let systemPromptText = "";
 
       if (mode === 'live') {
-        // Live Mode: Silent coach
         systemPromptText = "You are Vireo, silent speech coach. Observe the talk and output transcript only. Do not generate conversational audio responses.";
       } else {
-        // Rehearsal Mode: Active voice coach
         systemPromptText = "You are running a rehearsal with Mano. Camera and mic are on. You may interrupt when he buries point, abstracts, or exceeds 180 WPM.";
       }
 
@@ -242,7 +289,6 @@ wss.on('connection', (clientWs, req) => {
         systemPromptText += `\n\n[CARRIED-OVER SESSION CONTEXT]:\n${carriedContext}`;
       }
 
-      // FIX 5: Enable inputAudioTranscription and outputAudioTranscription in setup message
       const setupMessage = {
         setup: {
           model: geminiModel,
@@ -315,7 +361,6 @@ wss.on('connection', (clientWs, req) => {
       const msgStr = msg.toString();
       const parsed = JSON.parse(msgStr);
 
-      // FIX 6: Log server-side video frame forwarding
       if (parsed.realtimeInput?.mediaChunks) {
         for (const chunk of parsed.realtimeInput.mediaChunks) {
           if (chunk.mimeType === 'image/jpeg') {
@@ -324,7 +369,6 @@ wss.on('connection', (clientWs, req) => {
         }
       }
 
-      // FIX 10: Session Chunking Carryover with finalized transcript history
       if (parsed.type === 'trigger_chunk_reconnect') {
         chunkCount++;
         const summaryContext = contextHistory.slice(-20).join('\n') || parsed.context || 'Continuing session context...';
@@ -355,15 +399,16 @@ wss.on('connection', (clientWs, req) => {
   });
 
   clientWs.on('close', () => {
+    clearTimeout(sessionDurationTimer);
     if (geminiWs) {
       geminiWs.close(1000, 'Client disconnected');
     }
   });
 });
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   console.log(`====================================================`);
-  console.log(` Vireo Node Server running on http://localhost:${PORT}`);
-  console.log(` WebSocket Server mounted at ws://localhost:${PORT}/ws/live`);
+  console.log(` Vireo Node Server running on http://${HOST}:${PORT}`);
+  console.log(` WebSocket Server mounted at ws://${HOST}:${PORT}/ws/live`);
   console.log(`====================================================`);
 });
