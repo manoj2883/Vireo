@@ -80,7 +80,7 @@ export function WarmUpPage() {
                     type="button"
                     aria-pressed={on}
                     onClick={() => set('talkType', key)}
-                    className={cn('min-h-[46px] rounded-pill px-5 text-[16px]', on ? 'bg-olive font-semibold text-on-olive' : 'bg-surface-100 text-ink-muted hover:text-ink')}
+                    className={cn('min-h-[46px] rounded-pill px-5 text-[16px]', on ? 'bg-olive font-semibold text-olive-foreground' : 'bg-surface-100 text-ink-muted hover:text-ink')}
                   >
                     {TALK_TYPES[key].label}
                   </button>
@@ -111,7 +111,7 @@ export function WarmUpPage() {
                     key={value}
                     className={cn(
                       'flex cursor-pointer flex-col gap-2 rounded-[22px] p-[22px] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-[3px] has-[:focus-visible]:outline-olive',
-                      on ? 'bg-paper text-paper-foreground' : 'bg-surface-100'
+                      on ? 'paper-scope bg-paper text-paper-foreground' : 'bg-surface-100'
                     )}
                   >
                     <input type="radio" name={ids.mode} value={value} checked={on} onChange={() => set('mode', value)} className="sr-only" />

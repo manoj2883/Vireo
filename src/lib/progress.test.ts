@@ -100,3 +100,11 @@ describe('format', () => {
     expect(signed(-9)).toBe('−9');
   });
 });
+
+describe('cn', () => {
+  it('keeps a custom font size next to a colour', async () => {
+    const { cn } = await import('./utils');
+    expect(cn('font-display text-metric', 'text-amber')).toBe('font-display text-metric text-amber');
+    expect(cn('text-label', 'text-label text-olive')).toBe('text-label text-olive');
+  });
+});

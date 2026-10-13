@@ -38,21 +38,7 @@ export default {
         accent: { DEFAULT: token('accent'), foreground: token('accent-foreground') },
         popover: { DEFAULT: token('popover'), foreground: token('popover-foreground') },
         card: { DEFAULT: token('card'), foreground: token('card-foreground') },
-        paper: { DEFAULT: token('paper'), foreground: token('paper-foreground') },
-
-        // Legacy palette, still used by src/legacy and src/components until Phase 5
-        dark: {
-          900: '#0B0F19',
-          800: '#111827',
-          700: '#1F2937',
-          600: '#374151',
-        },
-        hud: {
-          cyan: '#06B6D4',
-          amber: '#F59E0B',
-          rose: '#F43F5E',
-          emerald: '#10B981'
-        }
+        paper: { DEFAULT: token('paper'), foreground: token('paper-foreground'), amber: token('paper-amber-soft'), olive: token('paper-olive-soft') },
       },
       fontFamily: {
         display: ['Newsreader', 'Georgia', 'serif'],

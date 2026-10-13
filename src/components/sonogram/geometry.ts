@@ -311,9 +311,46 @@ export function formatPauseSeconds(ms: number): string {
   return `${(ms / 1000).toFixed(1)} s pause`;
 }
 
+/**
+ * For small drawings of long answers: merge runs of ordinary words into longer strokes so the
+ * shape stays readable, while every filler keeps its own flat mark (so they can be counted).
+ */
+export function simplifySegments(segments: readonly WordSegment[], maxStrokes: number): WordSegment[] {
+  const speechCount = segments.filter((s) => s.kind !== 'filler').length;
+  const fillerCount = segments.length - speechCount;
+  const budget = Math.max(1, maxStrokes - fillerCount);
+  if (segments.length <= maxStrokes) return [...segments];
+  const per = Math.max(1, Math.ceil(speechCount / budget));
+  const out: WordSegment[] = [];
+  let run: WordSegment[] = [];
+  const flush = () => {
+    if (!run.length) return;
+    out.push({
+      text: run.map((r) => r.text).join(' '),
+      startMs: run[0].startMs,
+      endMs: run[run.length - 1].endMs,
+      kind: run.some((r) => r.kind === 'rushed') ? 'rushed' : 'speech',
+    });
+    run = [];
+  };
+  for (const seg of segments) {
+    if (seg.kind === 'filler') {
+      flush();
+      out.push(seg);
+    } else {
+      // Don't merge across a gap: pauses must stay visible.
+      if (run.length && seg.startMs - run[run.length - 1].endMs > 250) flush();
+      run.push(seg);
+      if (run.length >= per) flush();
+    }
+  }
+  flush();
+  return out;
+}
+
 export function layoutSonogram(input: LayoutInput): SonogramLayout {
   const spec = VARIANTS[input.variant ?? 'hero'];
-  const segments = input.segments;
+  const segments = input.variant === 'mini' ? simplifySegments(input.segments, 28) : input.segments;
   const pauses = input.pauses ?? [];
   const win = input.window ?? defaultWindow(segments, pauses);
   const span = Math.max(1, win.endMs - win.startMs);

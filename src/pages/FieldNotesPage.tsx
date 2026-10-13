@@ -213,6 +213,7 @@ function FieldNotesView({
             selectedPinLabel={selectedNote?.title}
             showWordLabels={false}
             showTimeAxis
+            labelPauses={false}
             label={`The whole answer as a sonogram: ${session.segments.length} words, ${session.metrics.fillerCount} fillers, ${session.metrics.pauseCount} pauses.${selectedNote ? ` Pinned: ${selectedNote.title}` : ''}`}
           />
         </div>
@@ -240,7 +241,7 @@ function FieldNotesView({
       </section>
 
       {notes && session.config.audience && (
-        <section aria-labelledby="aud-h" className="flex flex-col gap-6 rounded-[32px] bg-olive p-8 text-on-olive sm:p-14">
+        <section aria-labelledby="aud-h" className="flex flex-col gap-6 rounded-[32px] bg-olive p-8 text-olive-foreground sm:p-14">
           <p id="aud-h" className="m-0 text-[17px] font-semibold">
             Audience mode: the follow-up a sharp listener would ask
           </p>
@@ -329,7 +330,7 @@ function Scores({ notes, best, session }: { notes: FieldNotes; best: ReturnType<
             <div className="flex flex-wrap items-baseline gap-3">
               <span className={cn('font-display text-metric', down && 'text-amber')}>{score}</span>
               {change !== null && (
-                <span className={cn('text-[15px] font-semibold', down ? 'text-amber' : 'text-olive')}>{signed(change)} on your best</span>
+                <span className={cn('text-[15px] font-semibold', down ? 'text-amber' : 'text-olive')}>{change === 0 ? 'Matches your best' : `${signed(change)} on your best`}</span>
               )}
             </div>
             <p className="m-0 mt-2.5 text-lg font-semibold">{it.label}</p>
@@ -390,7 +391,7 @@ function QuoteText({ quote, segments }: { quote: string; segments: readonly Word
     <>
       {quote.split(/(\s+)/).map((part, i) =>
         fillers.has(part.toLowerCase().replace(/[^\p{L}']/gu, '')) ? (
-          <mark key={i} className="rounded-sm bg-amber-soft px-0.5 italic text-inherit">
+          <mark key={i} className="rounded-sm bg-paper-amber px-0.5 italic text-inherit">
             {part}
           </mark>
         ) : (
@@ -419,13 +420,13 @@ function NoteCard({
     <article
       aria-labelledby={titleId}
       className={cn(
-        'flex flex-col gap-3 rounded-[24px] bg-paper p-[26px] text-paper-foreground transition-[transform,box-shadow] duration-200',
+        'paper-scope flex flex-col gap-3 rounded-[24px] bg-paper p-[26px] text-paper-foreground transition-[transform,box-shadow] duration-200',
         selected ? '-translate-y-0.5 shadow-[0_0_0_3px_rgb(var(--olive)),var(--shadow-lift)]' : 'opacity-90'
       )}
     >
       <button type="button" aria-pressed={selected} onClick={onSelect} className="flex flex-col gap-3 rounded-sm text-left">
         <span className="flex flex-wrap items-center gap-3">
-          <span className={cn('rounded-pill px-3 py-1 text-label', note.kind === 'keep' ? 'bg-olive-soft text-ink dark:text-paper-foreground' : 'bg-amber-soft text-ink dark:text-paper-foreground')}>
+          <span className={cn('rounded-pill px-3 py-1 text-label', note.kind === 'keep' ? 'bg-paper-olive' : 'bg-paper-amber')}>
             {note.kind === 'keep' ? 'Keep this' : 'Fix next'}
           </span>
           <span className="text-small opacity-75">at {clock(note.startMs)}</span>

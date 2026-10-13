@@ -27,7 +27,7 @@ export function PauseRing({ pausingMs, size = 112, className }: { pausingMs: num
         />
         <circle cx="44" cy="44" r={pausing ? 6 + 9 * fill : 0} className="fill-sky" opacity="0.75" />
       </svg>
-      <span className="text-small text-ink-muted" aria-hidden="true">
+      <span className="text-small tabular-nums text-ink-muted" aria-hidden="true">
         {pausing ? `Pausing ${(pausingMs / 1000).toFixed(1)} s` : 'Pause'}
       </span>
     </div>

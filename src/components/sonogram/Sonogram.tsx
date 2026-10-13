@@ -40,6 +40,8 @@ export interface SonogramProps {
   selectedPinLabel?: string;
   showWordLabels?: boolean;
   showTimeAxis?: boolean;
+  /** Label pauses automatically in the annotation band (hero only). */
+  labelPauses?: boolean;
   className?: string;
 }
 
@@ -75,6 +77,7 @@ export function Sonogram({
   selectedPinLabel,
   showWordLabels = true,
   showTimeAxis = false,
+  labelPauses = true,
   className,
 }: SonogramProps) {
   const resolvedVariant: SonogramVariant = variant ?? (mode === 'scrolling' ? 'ribbon' : 'hero');
@@ -100,8 +103,9 @@ export function Sonogram({
         window: layoutWindow,
         nowMs: scrolling ? nowMs : undefined,
         minPxPerSecond: scrolling ? undefined : minPxPerSecond,
+        labelPauses,
       }),
-    [segments, pauses, annotations, resolvedVariant, layoutWindow, scrolling, nowMs, minPxPerSecond]
+    [segments, pauses, annotations, resolvedVariant, layoutWindow, scrolling, nowMs, minPxPerSecond, labelPauses]
   );
 
   const { width, height, spec } = layout;
@@ -136,15 +140,17 @@ export function Sonogram({
   }, [revealing, revealKey, width, spec.padX, revealDurationMs, sweep]);
 
   const description = label ?? describeSonogram(segments, pauses, annotations);
-  const nonScaling = scrolling ? 'non-scaling-stroke' : undefined;
+  // The ribbon and mini drawings stretch to their box; keep stroke weights constant.
+  const stretch = scrolling || resolvedVariant === 'mini';
+  const nonScaling = stretch ? 'non-scaling-stroke' : undefined;
   const legibleWidth = minPxPerSecond && width > spec.width;
 
   const svg = (
     <svg
       viewBox={`0 0 ${width} ${height}`}
       width={legibleWidth ? width : '100%'}
-      height={scrolling ? '100%' : undefined}
-      preserveAspectRatio={scrolling ? 'none' : 'xMidYMid meet'}
+      height={stretch ? '100%' : undefined}
+      preserveAspectRatio={stretch ? 'none' : 'xMidYMid meet'}
       role={label === '' ? undefined : 'img'}
       aria-label={label === '' ? undefined : description}
       aria-hidden={label === '' ? true : undefined}

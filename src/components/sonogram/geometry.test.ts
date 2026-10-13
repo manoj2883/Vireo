@@ -8,6 +8,7 @@ import {
   layoutSonogram,
   pathFromPoints,
   referencePitch,
+  simplifySegments,
 } from './geometry';
 import { DEMO_ANNOTATIONS, DEMO_PAUSES, DEMO_SEGMENTS } from './demo';
 import type { WordSegment } from './types';
@@ -236,5 +237,28 @@ describe('helpers', () => {
     expect(describeSonogram([word('a', 0, 1)], [], [{ startMs: 0, endMs: 1, text: 'nice' }])).toBe(
       'Sonogram of 1 word, 0 fillers, 0 pauses. Notes: nice.'
     );
+  });
+});
+
+describe('simplifySegments', () => {
+  const long = Array.from({ length: 90 }, (_, i) => word(i % 15 === 7 ? 'um' : `w${i}`, i * 300, i * 300 + 250, i % 15 === 7 ? 'filler' : 'speech'));
+
+  it('merges ordinary words but keeps every filler on its own', () => {
+    const out = simplifySegments(long, 28);
+    expect(out.length).toBeLessThanOrEqual(28 + 6);
+    expect(out.filter((s) => s.kind === 'filler')).toHaveLength(6);
+    expect(out[0].startMs).toBe(0);
+    expect(out[out.length - 1].endMs).toBe(long[long.length - 1].endMs);
+  });
+
+  it('never merges across a pause', () => {
+    const segs = [word('a', 0, 200), word('b', 220, 400), word('c', 1400, 1600), ...Array.from({ length: 40 }, (_, i) => word('x', 2000 + i * 210, 2200 + i * 210))];
+    const out = simplifySegments(segs, 10);
+    expect(out.some((s) => s.startMs < 1000 && s.endMs > 1000)).toBe(false);
+  });
+
+  it('leaves short answers alone, and the mini variant uses it', () => {
+    expect(simplifySegments(long.slice(0, 10), 28)).toHaveLength(10);
+    expect(layoutSonogram({ segments: long, variant: 'mini' }).words.length).toBeLessThan(40);
   });
 });

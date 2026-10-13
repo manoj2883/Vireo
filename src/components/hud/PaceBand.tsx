@@ -23,7 +23,7 @@ export function PaceBand({ wpm, zone, ghostWpm, rushing = false, showLegend = tr
       <div className="flex items-baseline justify-between text-small text-ink-muted">
         <span>Pace</span>
         <span>
-          <span className="font-semibold text-ink">{wpm === null ? '—' : wpm}</span> wpm
+          <span className="font-semibold tabular-nums text-ink">{wpm === null ? '—' : wpm}</span> wpm
         </span>
       </div>
       <div

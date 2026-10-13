@@ -29,6 +29,9 @@
     /* Field-note cards flip to paper in dark mode: ink fill, dark text */
     --paper: var(--ink);
     --paper-foreground: var(--surface-000);
+    /* Chips and highlights on paper keep the light theme's soft tints */
+    --paper-amber-soft: 255 217 201;
+    --paper-olive-soft: 230 237 176;
   }
 
   :root[data-theme='light'] {
@@ -50,6 +53,24 @@
 
     --paper: var(--surface-100);
     --paper-foreground: var(--ink);
+    --paper-amber-soft: var(--amber-soft);
+    --paper-olive-soft: var(--olive-soft);
+  }
+
+  /*
+   * Inside paper cards (light cards in the dark theme), use the light theme's accents so
+   * strokes, chips and muted text keep their contrast.
+   */
+  :root[data-theme='dark'] .paper-scope,
+  :root:not([data-theme]) .paper-scope {
+    --line: 143 152 180;
+    --ink-muted: 82 91 120;
+    --olive: 93 107 12;
+    --on-olive: 255 255 255;
+    --olive-soft: 230 237 176;
+    --amber: 180 71 31;
+    --amber-soft: 255 217 201;
+    --sky: 15 111 114;
   }
 
   /* shadcn/ui theme slots, pointed at the Vireo tokens */
@@ -82,7 +103,6 @@
     background-color: rgb(var(--surface-000));
     color: rgb(var(--ink));
     font-family: 'Schibsted Grotesk', system-ui, sans-serif;
-    font-feature-settings: 'tnum' 1;
     -webkit-font-smoothing: antialiased;
   }
 

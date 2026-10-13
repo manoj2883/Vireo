@@ -107,7 +107,7 @@ function LiveView({
         <div className="flex min-w-0 flex-wrap items-center gap-4">
           <span className="inline-flex h-9 items-center gap-2.5 rounded-pill bg-surface-100 px-3.5">
             <span className="h-[9px] w-[9px] rounded-pill bg-alert" aria-hidden="true" />
-            <span className="text-label" aria-label={`Recording, ${clock(snap.elapsedMs)}`}>
+            <span className="text-label tabular-nums" aria-label={`Recording, ${clock(snap.elapsedMs)}`}>
               {clock(snap.elapsedMs)}
             </span>
           </span>
@@ -121,7 +121,7 @@ function LiveView({
 
       <main className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 sm:px-8">
         {failed && (
-          <div role="alert" className="flex flex-wrap items-center justify-between gap-4 rounded-md bg-paper px-6 py-4 text-paper-foreground">
+          <div role="alert" className="paper-scope flex flex-wrap items-center justify-between gap-4 rounded-md bg-paper px-6 py-4 text-paper-foreground">
             <p className="m-0 max-w-[720px] text-body">
               {failed} Pauses are still measured on this device, but pace, fillers and field notes need the live transcript.
             </p>
@@ -158,7 +158,7 @@ function LiveView({
           {snap.coachSays && (
             <div
               role="status"
-              className="absolute left-1/2 top-7 flex max-w-[calc(100%-48px)] -translate-x-1/2 items-center gap-3.5 rounded-pill bg-paper px-[22px] py-3.5 text-paper-foreground shadow-lift"
+              className="paper-scope absolute left-1/2 top-7 flex max-w-[calc(100%-48px)] -translate-x-1/2 items-center gap-3.5 rounded-pill bg-paper px-[22px] py-3.5 text-paper-foreground shadow-lift"
             >
               <Volume2 className="h-[22px] w-[22px] shrink-0 text-amber" aria-hidden="true" />
               <span className="font-display text-[22px]">{snap.coachSays}</span>

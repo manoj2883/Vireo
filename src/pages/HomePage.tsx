@@ -51,14 +51,14 @@ export function HomePage() {
           <p className="m-0 max-w-[520px] text-[19px] leading-[30px] text-ink-muted">{headline.detail}</p>
         </div>
 
-        <div className="flex min-w-0 flex-[1_1_400px] flex-col gap-[18px] rounded-[32px] bg-paper p-8 text-paper-foreground sm:p-9">
+        <div className="paper-scope flex min-w-0 flex-[1_1_400px] flex-col gap-[18px] rounded-[32px] bg-paper p-8 text-paper-foreground sm:p-9">
           {drill && withDrill ? (
             <>
               <p className="m-0 text-[15px] font-semibold opacity-75">Today’s drill, from your {relativeDay(withDrill.createdAt).toLowerCase() === 'today' ? 'latest' : relativeDay(withDrill.createdAt).toLowerCase()} notes</p>
               <h2 className="m-0 font-display text-[46px] font-normal leading-[48px] tracking-[-0.02em]">{drill.title}</h2>
               <p className="m-0 text-body opacity-85">{drill.instructions}</p>
               <div className="mt-auto flex flex-wrap items-center gap-3 pt-2">
-                <Button size="lg" onClick={startDrill} className="bg-surface-000 text-ink hover:bg-surface-000/90">
+                <Button size="lg" onClick={startDrill} className="bg-paper-foreground text-paper hover:bg-paper-foreground/90">
                   <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                   Start the drill
                 </Button>
@@ -73,7 +73,7 @@ export function HomePage() {
                 Pick something you need to say well this week. Speak for a minute or two. Vireo will draw it, then write you a drill from what it hears.
               </p>
               <div className="mt-auto pt-2">
-                <Button asChild size="lg" className="bg-surface-000 text-ink hover:bg-surface-000/90">
+                <Button asChild size="lg" className="bg-paper-foreground text-paper hover:bg-paper-foreground/90">
                   <Link to="/warm-up">
                     <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                     Start a session

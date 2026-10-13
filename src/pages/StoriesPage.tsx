@@ -169,7 +169,7 @@ function StoryCard({
   const points = keyPointResults(story, session);
   return (
     <li>
-      <article aria-labelledby={titleId} className={cn('flex h-full flex-col gap-4 rounded-lg p-7', featured ? 'bg-paper text-paper-foreground' : 'bg-surface-100')}>
+      <article aria-labelledby={titleId} className={cn('flex h-full flex-col gap-4 rounded-lg p-7', featured ? 'paper-scope bg-paper text-paper-foreground' : 'bg-surface-100')}>
         <div className="flex items-baseline justify-between gap-3">
           <span className={cn('font-semibold', featured ? 'text-paper-foreground' : 'text-olive')}>{story.tag}</span>
           <span className="text-small opacity-75">{story.length}</span>
@@ -207,7 +207,7 @@ function StoryCard({
             <Button variant="ghost" size="sm" onClick={onEdit} className={cn('min-h-11', featured && 'text-paper-foreground hover:bg-surface-000/10')}>
               Edit
             </Button>
-            <Button size="sm" onClick={onRehearse} className={cn('min-h-11', featured ? 'bg-surface-000 text-ink hover:bg-surface-000/90' : 'bg-transparent text-ink shadow-[inset_0_0_0_1.5px_rgb(var(--line))] hover:bg-surface-200')}>
+            <Button size="sm" onClick={onRehearse} className={cn('min-h-11', featured ? 'bg-paper-foreground text-paper hover:bg-paper-foreground/90' : 'bg-transparent text-ink shadow-[inset_0_0_0_1.5px_rgb(var(--line))] hover:bg-surface-200')}>
               Rehearse
             </Button>
           </span>

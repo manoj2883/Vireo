@@ -25,7 +25,7 @@ export function FillerTicker({ count, sinceLastMs, lastFiller, className }: Fill
       <span className="text-small text-ink-muted" aria-hidden="true">
         Fillers
       </span>
-      <span className="font-display text-[30px] leading-none" aria-hidden="true">
+      <span className="font-display text-[30px] leading-none tabular-nums" aria-hidden="true">
         {count}
       </span>
       <span className="flex items-end gap-1.5" aria-hidden="true">

@@ -106,9 +106,9 @@ export function LaunchPage() {
               </dl>
               <p className="m-0 font-display text-lg italic text-ink-muted">Which part was too fast? Which fillers? You’ll have to guess.</p>
             </div>
-            <article className="flex flex-col gap-4 rounded-lg bg-paper p-7 text-paper-foreground shadow-lift sm:p-9">
+            <article className="paper-scope flex flex-col gap-4 rounded-lg bg-paper p-7 text-paper-foreground shadow-lift sm:p-9">
               <p className="m-0 flex items-center gap-3">
-                <span className="rounded-pill bg-amber-soft px-3 py-1 text-label text-ink dark:text-paper-foreground">Fix next</span>
+                <span className="rounded-pill bg-paper-amber px-3 py-1 text-label">Fix next</span>
                 <span className="text-small opacity-75">A Vireo field note</span>
               </p>
               <h3 className="m-0 font-display text-[34px] font-medium leading-[38px] tracking-[-0.01em]">You rushed your result.</h3>
@@ -118,8 +118,8 @@ export function LaunchPage() {
               <blockquote className="m-0 flex gap-4 rounded-md bg-surface-200/60 px-5 py-4 dark:bg-surface-000/10">
                 <span className="text-small opacity-75">2:14</span>
                 <span className="text-[17px] leading-[27px]">
-                  “and <mark className="rounded-sm bg-amber-soft px-0.5 italic text-inherit">so basically</mark> the answers it refused were the right ones to refuse, and{' '}
-                  <mark className="rounded-sm bg-amber-soft px-0.5 italic text-inherit">um</mark> that’s the main thing”
+                  “and <mark className="rounded-sm bg-paper-amber px-0.5 italic text-inherit">so basically</mark> the answers it refused were the right ones to refuse, and{' '}
+                  <mark className="rounded-sm bg-paper-amber px-0.5 italic text-inherit">um</mark> that’s the main thing”
                 </span>
               </blockquote>
               <p className="m-0 text-small opacity-75">Quote checked against your transcript</p>

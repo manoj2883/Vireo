@@ -150,7 +150,7 @@ describe('Field notes', () => {
     expect(screen.getByText('82')).toBeInTheDocument();
     expect(screen.getByText('Keep this')).toBeInTheDocument();
     expect(screen.getByText('Fix next')).toBeInTheDocument();
-    expect(screen.getAllByText(/1\.2 s pause/).length).toBeGreaterThanOrEqual(2); // in the drawing and the transcript
+    expect(screen.getByText(/1\.2 s pause/)).toBeInTheDocument(); // in the transcript; the drawing leaves room for note pins
     expect((await getSession('sess_1'))?.notesStatus).toBe('ready');
   });
 
