@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vireo · Live session</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#121829}
+a{color:#d7e36b;text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+a:focus-visible,button:focus-visible{outline:2px solid #d7e36b;outline-offset:3px}
+</style>
+</helmet>
+<div style="min-height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; background: #121829; color: #eef0f6; font-family: 'Schibsted Grotesk', system-ui, sans-serif; font-feature-settings: 'tnum' 1;">
+
+<header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 24px; padding: 18px 32px;">
+  <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap; min-width: 0;">
+    <span style="display: inline-flex; align-items: center; gap: 10px; height: 36px; padding: 0 14px; border-radius: 999px; background: #1b2340;">
+      <span style="width: 9px; height: 9px; border-radius: 999px; background: #ff6b5e;"></span>
+      <span style="font-size: 15px; font-weight: 600;">{{clock}}</span>
+    </span>
+    <span style="font-family: Newsreader, Georgia, serif; font-size: 22px;">Tell me about your research and why it matters.</span>
+  </div>
+  <span style="display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 999px; box-shadow: inset 0 0 0 1px #3a4670; font-size: 14px; font-weight: 600; color: #c8cee0;">{{modeLabel}}</span>
+</header>
+
+<main style="flex: 1; display: flex; flex-direction: column; gap: 16px; padding: 0 32px 24px; min-height: 0;">
+  <div style="{{frameStyle}}">
+
+    <sc-if value="{{showFace}}" hint-placeholder-val="{{true}}">
+      <div style="position: absolute; inset: 0 0 180px; display: flex; align-items: flex-end; justify-content: center;" aria-hidden="true">
+        <svg viewBox="0 0 300 220" width="44%" style="max-width: 500px;"><circle cx="150" cy="92" r="46" fill="#252f52"></circle><path d="M56 220c6-58 46-88 94-88s88 30 94 88z" fill="#252f52"></path></svg>
+      </div>
+    </sc-if>
+    <sc-if value="{{hideFace}}" hint-placeholder-val="{{false}}">
+      <div style="position: absolute; inset: 0 0 260px; display: flex; align-items: center; justify-content: center;">
+        <p style="margin: 0; font-family: Newsreader, Georgia, serif; font-style: italic; font-size: 26px; color: #a3abc4;">Your face is hidden. Vireo still sees you.</p>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{showBubble}}" hint-placeholder-val="{{false}}">
+      <div role="status" style="position: absolute; top: 28px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 14px; padding: 14px 22px; border-radius: 999px; background: #eef0f6; color: #141a2c; box-shadow: 0 12px 32px rgba(0,0,0,0.45); max-width: calc(100% - 48px);">
+        <svg width="22" height="22" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6v4h2.5L9 13V3L5.5 6z" fill="none" stroke="#b4471f" stroke-width="1.6" stroke-linejoin="round"></path><path d="M11.5 5.5a3.5 3.5 0 0 1 0 5" fill="none" stroke="#b4471f" stroke-width="1.6" stroke-linecap="round"></path></svg>
+        <span style="font-family: Newsreader, Georgia, serif; font-size: 22px;">Slow down. Let the result land.</span>
+      </div>
+    </sc-if>
+
+    <div style="position: absolute; top: 28px; right: 28px; display: flex; align-items: center; gap: 14px; height: 52px; padding: 0 20px; border-radius: 999px; background: rgba(27,35,64,0.9);">
+      <span style="font-size: 14px; color: #a3abc4;">Fillers</span>
+      <span style="font-family: Newsreader, Georgia, serif; font-size: 30px; line-height: 1;">{{fillers}}</span>
+      <span style="display: flex; gap: 6px; align-items: flex-end;" aria-hidden="true">
+        <sc-for list="{{ticks}}" as="k" hint-placeholder-count="3"><span style="{{k.s}}"></span></sc-for>
+      </span>
+      <span style="font-family: Newsreader, Georgia, serif; font-style: italic; font-size: 18px; color: #ff9e7a; min-width: 108px;">{{lastFiller}}</span>
+    </div>
+
+    <div style="position: absolute; left: 0; right: 0; bottom: 0; padding: 0 32px 28px; display: flex; flex-direction: column; gap: 18px; background: linear-gradient(180deg, rgba(27,35,64,0) 0%, rgba(27,35,64,0.96) 32%);">
+      <sc-if value="{{captions}}" hint-placeholder-val="{{true}}">
+        <p style="margin: 40px 0 0; max-width: 900px; font-family: Newsreader, Georgia, serif; font-size: 26px; line-height: 34px; color: #eef0f6;"><sc-for list="{{capWords}}" as="w" hint-placeholder-count="8"><span style="{{w.s}}">{{w.t}} </span></sc-for></p>
+      </sc-if>
+      <div style="display: flex; align-items: flex-end; gap: 32px;">
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px;">
+          <svg viewBox="0 0 1000 120" width="100%" height="120" preserveAspectRatio="none" aria-hidden="true">
+            <line x1="0" y1="110" x2="1000" y2="110" stroke="#3a4670" stroke-width="1"></line>
+            <sc-for list="{{ribbon}}" as="r" hint-placeholder-count="20">
+              <path d="{{r.d}}" fill="none" stroke="{{r.c}}" stroke-opacity="{{r.o}}" stroke-width="{{r.w}}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path>
+            </sc-for>
+            <sc-if value="{{pausing}}" hint-placeholder-val="{{false}}">
+              <rect x="{{pauseX}}" y="14" width="{{pauseW}}" height="96" rx="8" fill="#6fd3d0" fill-opacity="0.12"></rect>
+            </sc-if>
+            <line x1="1000" y1="6" x2="1000" y2="114" stroke="#eef0f6" stroke-width="2"></line>
+          </svg>
+          <div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; font-size: 14px; color: #a3abc4;"><span>Pace</span><span><span style="color: #eef0f6; font-weight: 600;">{{wpm}}</span> wpm</span></div>
+            <div role="meter" aria-label="Speaking pace" aria-valuemin="80" aria-valuemax="220" aria-valuenow="{{wpm}}" style="position: relative; height: 20px; border-radius: 999px; background: #252f52;">
+              <div style="position: absolute; top: 0; bottom: 0; left: 36%; width: 22%; border-radius: 999px; background: rgba(215,227,107,0.14); box-shadow: inset 0 0 0 1.5px #d7e36b;"></div>
+              <div style="position: absolute; top: 50%; left: 47%; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 999px; background: #eef0f6; opacity: 0.35;" title="Your best take"></div>
+              <div style="{{dotStyle}}"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 13px; color: #a3abc4;"><span>slower</span><span>130 to 160, the faint dot is your best take</span><span>faster</span></div>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0;">
+          <svg width="112" height="112" viewBox="0 0 88 88" role="img" aria-label="{{pauseLabel}}">
+            <circle cx="44" cy="44" r="36" fill="none" stroke="#252f52" stroke-width="6"></circle>
+            <circle cx="44" cy="44" r="36" fill="none" stroke="#6fd3d0" stroke-width="6" stroke-linecap="round" stroke-dasharray="226" stroke-dashoffset="{{pauseOffset}}" transform="rotate(-90 44 44)"></circle>
+            <circle cx="44" cy="44" r="{{breathR}}" fill="#6fd3d0" opacity="0.75"></circle>
+          </svg>
+          <span style="font-size: 14px; color: #a3abc4;">{{pauseText}}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      <button type="button" role="switch" aria-checked="{{hideFace}}" onClick="{{toggleFace}}" style="display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px; border-radius: 999px; border: 0; background: #1b2340; color: #eef0f6; font-size: 15px; font-weight: 600;"><span style="{{faceTrack}}"><span style="{{faceKnob}}"></span></span>Hide my face</button>
+      <button type="button" role="switch" aria-checked="{{captions}}" onClick="{{toggleCaptions}}" style="display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 18px; border-radius: 999px; border: 0; background: #1b2340; color: #eef0f6; font-size: 15px; font-weight: 600;"><span style="{{capTrack}}"><span style="{{capKnob}}"></span></span>Live captions</button>
+    </div>
+    <a href="Teardown.dc.html" style="display: inline-flex; align-items: center; gap: 12px; height: 58px; padding: 0 30px; border-radius: 999px; background: #eef0f6; color: #121829; font-weight: 700; font-size: 17px;"><span style="width: 12px; height: 12px; border-radius: 3px; background: #121829;"></span>End and see field notes</a>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"mode":{"editor":"enum","options":["Coach me out loud","Watch silently"],"default":"Coach me out loud","section":"Demo"},"animate":{"editor":"boolean","default":true,"section":"Demo"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { t: 11.2, hideFace: false, captions: true };
+    const raw = [
+      ['So', 0.22], ['my', 0.2], ['research', 0.42], ['is', 0.16], ['about', 0.3], ['teaching', 0.4], ['AI', 0.3], ['systems', 0.42], ['to', 0.14], ['say', 0.26], ['no', 0.4],
+      [null, 1.5],
+      ['when', 0.24], ['they', 0.2], ['don’t', 0.26], ['have', 0.22], ['the', 0.14], ['evidence.', 0.6],
+      ['Um,', 0.55, 'f'], ['so', 0.28, 'f'], ['basically,', 0.6, 'f'],
+      ['the', 0.1, 'r'], ['answers', 0.22, 'r'], ['it', 0.08, 'r'], ['refused', 0.2, 'r'], ['were', 0.12, 'r'], ['the', 0.08, 'r'], ['right', 0.14, 'r'], ['ones', 0.14, 'r'], ['to', 0.08, 'r'], ['refuse.', 0.32, 'r']
+    ];
+    let t = 0.4;
+    this.words = raw.map(([w, d, k]) => { const o = { w, s: t, d, k: k || (w ? 'n' : 'p') }; t += d + (w ? 0.08 : 0); return o; });
+    this.loop = t + 1.6;
+  }
+  componentDidMount() {
+    let reduce = false;
+    try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    if (reduce) return;
+    this.timer = setInterval(() => {
+      if (this.props.animate === false) return;
+      this.setState({ t: (this.state.t + 0.1) % this.loop });
+    }, 100);
+  }
+  componentWillUnmount() { clearInterval(this.timer); }
+  renderVals() {
+    const t = this.state.t;
+    const coach = (this.props.mode ?? 'Coach me out loud') === 'Coach me out loud';
+    const said = this.words.filter((w) => w.w && w.s <= t);
+    const current = this.words.find((w) => t >= w.s && t < w.s + w.d + 0.08);
+    const pausing = current && current.k === 'p';
+    const rushingWord = current && current.k === 'r';
+    const fillerWords = said.filter((w) => w.k === 'f');
+    const lastF = fillerWords[fillerWords.length - 1];
+    const sinceF = lastF ? t - lastF.s : 99;
+    const wpm = rushingWord ? 184 : (current && current.k === 'f') ? 132 : pausing ? 0 : 146;
+    const rushing = rushingWord;
+    const shownWpm = pausing ? '—' : wpm;
+    const dotLeft = pausing ? 40 : Math.max(4, Math.min(96, (wpm - 80) / 140 * 100));
+    const dotBase = 'position:absolute;top:50%;left:' + dotLeft + '%;margin:-13px 0 0 -13px;width:26px;height:26px;border-radius:999px;transition:left .5s cubic-bezier(.2,.9,.25,1), box-shadow .3s, background .3s;';
+    const dotStyle = rushing ? dotBase + 'background:#ff9e7a;box-shadow:0 0 0 7px rgba(255,158,122,0.2),0 0 0 8.5px #ff9e7a;' : dotBase + 'background:#d7e36b;box-shadow:0 0 0 6px rgba(215,227,107,0.14);';
+    const frameBase = 'position:relative;flex:1;min-height:600px;border-radius:28px;overflow:hidden;background:#1b2340;transition:box-shadow .5s;';
+    const frameStyle = rushing ? frameBase + 'box-shadow:inset 0 0 0 3px #ff9e7a, inset 0 0 140px rgba(255,158,122,0.2);' : frameBase + 'box-shadow:inset 0 0 0 1px #2c3760;';
+    const W = 6;
+    const ribbon = [];
+    this.words.forEach((w, wi) => {
+      if (!w.w) return;
+      const a = w.s, b = Math.min(w.s + w.d, t);
+      if (a > t || w.s + w.d < t - W) return;
+      const xa = (Math.max(a, t - W) - (t - W)) / W * 1000;
+      const xb = (b - (t - W)) / W * 1000;
+      if (xb - xa < 1) return;
+      const base = w.k === 'f' ? 92 : w.k === 'r' ? 80 : 86;
+      const amp = w.k === 'f' ? 1.5 : w.k === 'r' ? 9 : 7;
+      [[0, 6, 1], [34, 3.5, 0.55], [62, 2, 0.3]].forEach(([dy, sw, op], hi) => {
+        let d = '';
+        for (let i = 0; i <= 8; i++) {
+          const u = i / 8;
+          const y = base - dy - amp * (1 + hi * 0.4) * Math.sin(wi * 1.9 + u * (w.k === 'r' ? 8 : 4.5)) * Math.sin(Math.PI * Math.min(1, u * 1.05 + 0.02));
+          d += (i ? ' L' : 'M') + (xa + u * (xb - xa)).toFixed(1) + ' ' + y.toFixed(1);
+        }
+        ribbon.push({ d, w: sw, o: op, c: w.k === 'f' ? '#ff9e7a' : '#d7e36b' });
+      });
+    });
+    let pauseX = 0, pauseW = 0, pauseSec = 0;
+    if (pausing) {
+      pauseX = Math.max(0, (current.s - (t - W)) / W * 1000);
+      pauseW = 1000 - pauseX;
+      pauseSec = t - current.s;
+    }
+    const capWords = said.slice(-12).map((w) => ({ t: w.w, s: w.k === 'f' ? 'color:#ff9e7a;font-style:italic;' : 'color:#eef0f6;' }));
+    const ticks = [0, 1, 2].map((i) => {
+      const fresh = i === 0 ? Math.max(0.25, 1 - sinceF / 2.5) : i === 1 ? 0.45 : 0.2;
+      return { s: 'width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:12px solid #ff9e7a;opacity:' + (fillerWords.length > i ? fresh : 0.12) + ';' };
+    });
+    const mm = Math.floor(134 + t), clock = '0' + Math.floor(mm / 60) + ':' + String(mm % 60).padStart(2, '0');
+    const track = (on) => 'position:relative;display:inline-block;width:40px;height:24px;border-radius:999px;background:' + (on ? '#d7e36b' : '#3a4670') + ';';
+    const knob = (on) => 'position:absolute;top:3px;left:' + (on ? '19px' : '3px') + ';width:18px;height:18px;border-radius:999px;background:' + (on ? '#121829' : '#eef0f6') + ';';
+    const hide = this.state.hideFace, cap = this.state.captions;
+    return {
+      clock, modeLabel: coach ? 'Coaching out loud' : 'Watching silently',
+      frameStyle, dotStyle, wpm: shownWpm, ribbon, capWords, ticks,
+      fillers: 2 + fillerWords.length,
+      lastFiller: sinceF < 1.6 && lastF ? '“' + lastF.w.replace(/,$/, '') + '”' : '',
+      showBubble: coach && rushing,
+      pausing, pauseX: pauseX.toFixed(1), pauseW: pauseW.toFixed(1),
+      pauseOffset: pausing ? Math.max(0, 226 - 226 * Math.min(1, pauseSec / 1.4)).toFixed(1) : 226,
+      breathR: pausing ? (6 + 9 * Math.min(1, pauseSec / 1.4)).toFixed(1) : 0,
+      pauseText: pausing ? 'Pausing ' + pauseSec.toFixed(1) + ' s' : 'Pause',
+      pauseLabel: pausing ? 'Pausing' : 'Speaking',
+      showFace: !hide, hideFace: hide, captions: cap,
+      toggleFace: () => this.setState({ hideFace: !hide }),
+      toggleCaptions: () => this.setState({ captions: !cap }),
+      faceTrack: track(hide), faceKnob: knob(hide), capTrack: track(cap), capKnob: knob(cap)
+    };
+  }
+}
+</script>
+</body>
+</html>

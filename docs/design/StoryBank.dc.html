@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Vireo · Story Bank</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&amp;family=Schibsted+Grotesk:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#121829}
+a{color:#d7e36b;text-decoration:none}a:hover{color:#eef4a8}
+button{font-family:inherit;cursor:pointer}
+a:focus-visible,button:focus-visible{outline:2px solid #d7e36b;outline-offset:3px}
+</style>
+</helmet>
+<div style="min-height: 100vh; background: #121829; color: #eef0f6; font-family: 'Schibsted Grotesk', system-ui, sans-serif; font-feature-settings: 'tnum' 1;">
+
+<header style="max-width: 1240px; margin: 0 auto; padding: 20px 32px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;">
+  <div style="display: flex; align-items: center; gap: 36px; flex-wrap: wrap;">
+    <a href="Main.dc.html" style="display: flex; align-items: center; gap: 12px; color: #eef0f6;">
+      <svg width="30" height="30" viewBox="0 0 34 34" aria-hidden="true"><path d="M5 24c4-3 7-3 10 0s6 2 9-2" fill="none" stroke="#d7e36b" stroke-width="3.2" stroke-linecap="round"></path><path d="M5 16c4-3 7-3 10 0s6 2 9-2" fill="none" stroke="#d7e36b" stroke-opacity="0.6" stroke-width="2.4" stroke-linecap="round"></path><path d="M5 9c4-3 7-3 10 0s6 2 9-2" fill="none" stroke="#d7e36b" stroke-opacity="0.32" stroke-width="1.8" stroke-linecap="round"></path><circle cx="28.5" cy="21" r="2.2" fill="#ff9e7a"></circle></svg>
+      <span style="font-family: Newsreader, Georgia, serif; font-size: 26px; font-weight: 500;">Vireo</span>
+    </a>
+    <nav aria-label="App" style="display: flex; gap: 6px; flex-wrap: wrap; font-size: 15px; font-weight: 600;">
+      <a href="Home.dc.html" style="padding: 10px 16px; border-radius: 999px; color: #a3abc4;">Home</a>
+      <a href="StoryBank.dc.html" aria-current="page" style="padding: 10px 16px; border-radius: 999px; background: #1b2340; color: #eef0f6;">Story Bank</a>
+      <a href="Teardown.dc.html" style="padding: 10px 16px; border-radius: 999px; color: #a3abc4;">Sessions</a>
+    </nav>
+  </div>
+  <span aria-label="Account: Mano" style="display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 999px; background: #252f52; font-family: Newsreader, Georgia, serif; font-size: 20px;">M</span>
+</header>
+
+<main style="max-width: 1240px; margin: 0 auto; padding: 48px 32px 96px; display: flex; flex-direction: column; gap: 40px;">
+  <section style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 24px;">
+    <div style="max-width: 700px;">
+      <h1 style="margin: 0; font-family: Newsreader, Georgia, serif; font-weight: 400; font-size: clamp(56px, 7vw, 100px); line-height: 0.95; letter-spacing: -0.035em;">Story Bank</h1>
+      <p style="margin: 18px 0 0; font-size: 19px; line-height: 30px; color: #c8cee0;">The stories and lines you want ready on demand. Rehearse one and Vireo checks you hit its key points, not just how you sounded.</p>
+    </div>
+    <button type="button" style="display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 24px; border-radius: 999px; border: 0; background: #d7e36b; color: #121829; font-weight: 600; font-size: 16px;"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="#121829" stroke-width="2" stroke-linecap="round"></path></svg>{{newLabel}}</button>
+  </section>
+
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 8px; border-bottom: 1px solid #3a4670;">
+    <div role="tablist" aria-label="Library" style="display: flex; gap: 28px;">
+      <button type="button" role="tab" aria-selected="{{storiesOn}}" onClick="{{showStories}}" style="{{storiesTab}}">Stories <span style="font-family: 'Schibsted Grotesk', sans-serif; font-size: 15px; color: #a3abc4;">6</span></button>
+      <button type="button" role="tab" aria-selected="{{bitsOn}}" onClick="{{showBits}}" style="{{bitsTab}}">Bits <span style="font-family: 'Schibsted Grotesk', sans-serif; font-size: 15px; color: #a3abc4;">3</span></button>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+      <sc-for list="{{filters}}" as="c" hint-placeholder-count="4"><button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.pick}}" style="{{c.style}}">{{c.label}}</button></sc-for>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px;">
+    <sc-for list="{{cards}}" as="s" hint-placeholder-count="6">
+      <article style="{{s.style}}">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 14px;"><span style="{{s.tagStyle}}">{{s.tag}}</span><span style="{{s.metaStyle}}">{{s.length}}</span></div>
+        <h2 style="margin: 0; font-family: Newsreader, Georgia, serif; font-weight: 400; font-size: 32px; line-height: 35px; letter-spacing: -0.015em;">{{s.title}}</h2>
+        <p style="{{s.gistStyle}}">{{s.gist}}</p>
+        <svg viewBox="0 0 300 48" width="100%" height="48" aria-hidden="true"><sc-for list="{{s.strokes}}" as="k" hint-placeholder-count="6"><path d="{{k.d}}" fill="none" stroke="{{k.c}}" stroke-opacity="{{k.o}}" stroke-width="{{k.w}}" stroke-linecap="round"></path></sc-for></svg>
+        <ul style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px;">
+          <sc-for list="{{s.points}}" as="p" hint-placeholder-count="3"><li style="display: flex; align-items: center; gap: 10px; font-size: 15px;"><span style="{{p.dot}}"></span><span style="{{p.text}}">{{p.label}}</span></li></sc-for>
+        </ul>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: auto; padding-top: 8px;">
+          <span style="{{s.metaStyle}}">{{s.last}}</span>
+          <a href="WarmUp.dc.html" style="{{s.btn}}">Rehearse</a>
+        </div>
+      </article>
+    </sc-for>
+  </div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1200}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { tab: 'stories', filter: 'All' };
+  }
+  renderVals() {
+    const stories = [
+      { tag: 'Interview', length: '90 seconds', title: 'From data pipelines to LLM research', gist: 'Why putting pipelines into production made you care about when models should not answer.', points: [['The production gap', 1], ['What it taught you', 1], ['Why research, why now', 0]], last: 'Rehearsed yesterday', f: 2 },
+      { tag: 'Research', length: '2 minutes', title: 'The judge that learned to say no', gist: 'How DiabEvidence moved from similarity thresholds to a claim-checking judge.', points: [['Thresholds failed', 1], ['The two-stage judge', 1], ['The open question', 1]], last: 'Rehearsed Sunday', f: 3 },
+      { tag: 'Interview', length: '60 seconds', title: 'Tell me about yourself', gist: 'Engineer turned researcher, one current project, one thing you want to study next.', points: [['Who you are', 1], ['Current work', 1], ['What’s next', 1]], last: 'Rehearsed 5 days ago', f: 1 },
+      { tag: 'Interview', length: '2 minutes', title: 'The night the pipeline broke', gist: 'A production incident, what you checked first, and what you changed so it would not happen again.', points: [['The symptom', 1], ['First check', 0], ['The fix that stuck', 0]], last: 'Rehearsed once', f: 5 },
+      { tag: 'Pitch', length: '2 minutes', title: 'Niner Mano in two minutes', gist: 'Students can’t find the right campus office. A plain-language assistant that points them there.', points: [['The problem', 1], ['A real example', 1], ['The ask', 0]], last: 'Not rehearsed yet', f: -1 },
+      { tag: 'Research', length: '3 minutes', title: 'Why coaches should show their evidence', gist: 'The idea behind Vireo’s quoted feedback, and how you would test whether it helps people improve.', points: [['The trust gap', 1], ['The design', 0], ['How to test it', 0]], last: 'Not rehearsed yet', f: -1 }
+    ];
+    const bits = [
+      { tag: 'Opener', length: '30 seconds', title: 'Why my coach is named after a bird', gist: 'The vireo sings the same clear phrase hundreds of times a day. That is the whole training plan.', points: [['Setup', 1], ['Pause', 1], ['Turn', 1]], last: 'Rehearsed 3 days ago', f: 0 },
+      { tag: 'Callback', length: '10 seconds', title: 'The judge said no to me too', gist: 'A dry one-liner for when someone asks a question just outside your scope.', points: [['Land it dry', 1]], last: 'Rehearsed once', f: 1 },
+      { tag: 'Closer', length: '15 seconds', title: 'Happy to go deeper', gist: 'A calm close that invites the next question instead of trailing off.', points: [['Slow last line', 0]], last: 'Not rehearsed yet', f: -1 }
+    ];
+    const isStories = this.state.tab === 'stories';
+    const list = isStories ? stories : bits;
+    const tags = isStories ? ['All', 'Interview', 'Research', 'Pitch'] : ['All', 'Opener', 'Callback', 'Closer'];
+    const filter = tags.indexOf(this.state.filter) >= 0 ? this.state.filter : 'All';
+    const tab = (on) => 'display:inline-flex;align-items:baseline;gap:8px;min-height:44px;padding:0;border:0;background:none;font-family:Newsreader,Georgia,serif;font-size:30px;' + (on ? 'color:#eef0f6;box-shadow:inset 0 -2px 0 #d7e36b;' : 'color:#7d87a6;');
+    const chip = (on) => 'min-height:40px;padding:0 16px;border-radius:999px;border:0;font-size:15px;' + (on ? 'background:#eef0f6;color:#121829;font-weight:600;' : 'background:#1b2340;color:#c8cee0;');
+    const shown = list.filter((s) => filter === 'All' || s.tag === filter);
+    const cards = shown.map((s, ci) => {
+      const feat = ci === 0;
+      const strokes = [];
+      if (s.f >= 0) {
+        let x = 4, i = 0;
+        while (x < 292) {
+          const len = 16 + ((i * 3 + ci) % 4) * 5;
+          const isF = s.f > 0 && i % Math.max(2, Math.round(10 / s.f)) === 1;
+          [[0, 3, 1], [14, 1.8, 0.5]].forEach(([dy, w, o], h) => {
+            let d = '';
+            for (let k = 0; k <= 5; k++) { const u = k / 5; const y = 36 - dy - (isF ? 0 : (4 + h * 1.5) * Math.sin(i * 1.9 + ci + u * 4) * Math.sin(Math.PI * u)); d += (k ? ' L' : 'M') + (x + u * len).toFixed(1) + ' ' + y.toFixed(1); }
+            strokes.push({ d, w, o, c: isF ? (feat ? '#b4471f' : '#ff9e7a') : (feat ? '#5d6b0c' : '#d7e36b') });
+          });
+          x += len + 6; i++;
+        }
+      } else {
+        strokes.push({ d: 'M4 36 L296 36', w: 1.5, o: 0.6, c: feat ? '#8f98b4' : '#3a4670' });
+      }
+      return {
+        tag: s.tag, length: s.length, title: s.title, gist: s.gist, last: s.last, strokes,
+        style: 'display:flex;flex-direction:column;gap:16px;padding:28px;border-radius:28px;' + (feat ? 'background:#eef0f6;color:#141a2c;' : 'background:#1b2340;color:#eef0f6;'),
+        tagStyle: 'font-weight:600;' + (feat ? 'color:#5d6b0c;' : 'color:#d7e36b;'),
+        metaStyle: 'font-size:14px;' + (feat ? 'color:#525b78;' : 'color:#a3abc4;'),
+        gistStyle: 'margin:0;font-size:16px;line-height:25px;' + (feat ? 'color:#2a3350;' : 'color:#c8cee0;'),
+        btn: 'display:inline-flex;align-items:center;height:44px;padding:0 20px;border-radius:999px;font-weight:600;font-size:15px;' + (feat ? 'background:#121829;color:#eef0f6;' : 'box-shadow:inset 0 0 0 1.5px #5b6890;color:#eef0f6;'),
+        points: s.points.map(([label, hit]) => ({
+          label,
+          dot: 'flex-shrink:0;width:10px;height:10px;border-radius:999px;' + (hit ? 'background:' + (feat ? '#5d6b0c' : '#d7e36b') + ';' : 'box-shadow:inset 0 0 0 1.5px ' + (feat ? '#8f98b4' : '#5b6890') + ';'),
+          text: hit ? '' : (feat ? 'color:#525b78;' : 'color:#a3abc4;')
+        }))
+      };
+    });
+    return {
+      newLabel: isStories ? 'New story' : 'New bit',
+      storiesOn: isStories ? 'true' : 'false', bitsOn: isStories ? 'false' : 'true',
+      storiesTab: tab(isStories), bitsTab: tab(!isStories),
+      showStories: () => this.setState({ tab: 'stories', filter: 'All' }),
+      showBits: () => this.setState({ tab: 'bits', filter: 'All' }),
+      filters: tags.map((t) => ({ label: t, pressed: t === filter ? 'true' : 'false', style: chip(t === filter), pick: () => this.setState({ filter: t }) })),
+      cards
+    };
+  }
+}
+</script>
+</body>
+</html>

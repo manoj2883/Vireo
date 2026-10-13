@@ -2,15 +2,111 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
-  background-color: #0B0F19;
-  color: #F1F5F9;
-  margin: 0;
-  overflow-x: hidden;
+/*
+ * Vireo design tokens (docs/design/tokens.json).
+ * Colours are RGB channel triplets so Tailwind can apply opacity: rgb(var(--olive) / 0.15).
+ * Dark "Dawn chorus" is the default; light "Field guide" is opt-in via data-theme.
+ */
+@layer base {
+  :root,
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --surface-000: 18 24 41;
+    --surface-100: 27 35 64;
+    --surface-200: 37 47 82;
+    --line: 58 70 112;
+    --ink: 238 240 246;
+    --ink-muted: 163 171 196;
+    --olive: 215 227 107;
+    --on-olive: 18 24 41;
+    --olive-soft: 58 66 48;
+    --amber: 255 158 122;
+    --amber-soft: 74 47 53;
+    --sky: 111 211 208;
+    --alert: 255 107 94;
+    --shadow-lift: 0 18px 40px rgba(0, 0, 0, 0.35);
+
+    /* Field-note cards flip to paper in dark mode: ink fill, dark text */
+    --paper: var(--ink);
+    --paper-foreground: var(--surface-000);
+  }
+
+  :root[data-theme='light'] {
+    color-scheme: light;
+    --surface-000: 243 244 248;
+    --surface-100: 255 255 255;
+    --surface-200: 230 233 241;
+    --line: 143 152 180;
+    --ink: 20 26 44;
+    --ink-muted: 82 91 120;
+    --olive: 93 107 12;
+    --on-olive: 255 255 255;
+    --olive-soft: 230 237 176;
+    --amber: 180 71 31;
+    --amber-soft: 255 217 201;
+    --sky: 15 111 114;
+    --alert: 179 38 30;
+    --shadow-lift: 0 18px 40px rgba(20, 26, 44, 0.14);
+
+    --paper: var(--surface-100);
+    --paper-foreground: var(--ink);
+  }
+
+  /* shadcn/ui theme slots, pointed at the Vireo tokens */
+  :root {
+    --background: var(--surface-000);
+    --foreground: var(--ink);
+    --card: var(--surface-100);
+    --card-foreground: var(--ink);
+    --popover: var(--surface-100);
+    --popover-foreground: var(--ink);
+    --primary: var(--olive);
+    --primary-foreground: var(--on-olive);
+    --secondary: var(--surface-200);
+    --secondary-foreground: var(--ink);
+    --muted: var(--surface-200);
+    --muted-foreground: var(--ink-muted);
+    --accent: var(--surface-200);
+    --accent-foreground: var(--ink);
+    --destructive: var(--alert);
+    --destructive-foreground: var(--on-olive);
+    --border: var(--line);
+    --input: var(--line);
+    --ring: var(--olive);
+    --radius: 18px;
+  }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+    background-color: rgb(var(--surface-000));
+    color: rgb(var(--ink));
+    font-family: 'Schibsted Grotesk', system-ui, sans-serif;
+    font-feature-settings: 'tnum' 1;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--olive));
+    outline-offset: 3px;
+  }
+
+  ::selection {
+    background: rgb(var(--olive) / 0.35);
+  }
 }
 
-/* Pulse animation for HUD elements */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Pulse animation for HUD elements (legacy session screen) */
 @keyframes hud-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.15); opacity: 0.85; }
