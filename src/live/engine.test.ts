@@ -13,7 +13,8 @@ function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
   const client = { connect: vi.fn(async () => liveCb.onStatus('connected')), sendAudio: vi.fn(), sendVideoFrame: vi.fn(), sendNudge: vi.fn(() => true), close: vi.fn() };
   const saved: PaceTake[] = [];
   const engine = new LiveSessionEngine(
-    { mode, talkType: 'interview', prompt: 'Tell me about your research.' },
+    // Transcripts in these tests arrive the moment speech ends.
+    { mode, talkType: 'interview', prompt: 'Tell me about your research.', transcriptLatencyMs: 0 },
     {
       now: () => clock,
       autoTick: false,

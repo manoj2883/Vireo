@@ -19,6 +19,8 @@ export interface LiveSessionConfig {
   prompt: string;
   storyId?: string;
   fillers?: readonly string[];
+  /** Expected delay between speaking and the transcript arriving (see TranscriptTimeline). */
+  transcriptLatencyMs?: number;
 }
 
 export interface LiveSnapshot {
@@ -151,7 +153,7 @@ export class LiveSessionEngine {
     this.deps = deps;
     this.now = deps.now ?? (() => performance.now());
     this.fillers = config.fillers ?? DEFAULT_FILLERS;
-    this.timeline = new TranscriptTimeline({ fillers: this.fillers, rushedAboveWpm: this.zone.max });
+    this.timeline = new TranscriptTimeline({ fillers: this.fillers, rushedAboveWpm: this.zone.max, latencyMs: config.transcriptLatencyMs });
     this.nudges = new NudgeController(config.mode);
     this.snapshot = this.compute(0);
   }
@@ -207,7 +209,7 @@ export class LiveSessionEngine {
 
   /** Recompute metrics and the snapshot. Runs on a timer during a session. */
   tick(nowMs = this.elapsed()): LiveSnapshot {
-    const wpm = this.pace.update(this.timeline.wordStarts(), nowMs);
+    const wpm = this.pace.update(this.timeline.wordStarts(), nowMs, Math.min(nowMs, this.timeline.frontierMs() ?? nowMs));
     const speaking = this.vad.isSpeaking();
     const state = this.timeline.getWords().length ? paceState(Math.round(wpm), this.zone) : null;
 

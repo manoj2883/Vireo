@@ -170,7 +170,7 @@ describe('pace', () => {
 
 describe('TranscriptTimeline', () => {
   it('places words inside the speech the detector heard, keeping pauses as gaps', () => {
-    const tl = new TranscriptTimeline();
+    const tl = new TranscriptTimeline({ latencyMs: 0 });
     const voiced = [
       { startMs: 0, endMs: 1000 },
       { startMs: 2200, endMs: 3000 },
@@ -204,6 +204,13 @@ describe('TranscriptTimeline', () => {
     tl.updateUtterance('u1', 'they do not have', 800);
     tl.updateUtterance('u1', 'they do', 900);
     expect(tl.text()).toBe('they do');
+  });
+
+  it('leaves the latest speech for words still being transcribed', () => {
+    const tl = new TranscriptTimeline({ latencyMs: 500 });
+    // "our results" was said from 0 to 800; "were" started at 900. The chunk arrives at 1300.
+    tl.append('our results', 1300, [{ startMs: 0, endMs: 1300 }]);
+    expect(tl.getWords().every((w) => w.endMs <= 800)).toBe(true);
   });
 
   it('marks fillers and rushed words for the sonogram', () => {

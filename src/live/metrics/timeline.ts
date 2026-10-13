@@ -22,6 +22,11 @@ export interface TimelineOptions {
   fillers?: readonly string[];
   /** Words spoken faster than this are drawn as rushed. */
   rushedAboveWpm?: number;
+  /**
+   * How long transcription takes to arrive after the words are spoken. Speech heard in this
+   * last stretch belongs to words not transcribed yet, so new words are placed before it.
+   */
+  latencyMs?: number;
 }
 
 function tokenize(text: string): string[] {
@@ -78,10 +83,12 @@ export class TranscriptTimeline {
   private utterances = new Map<string, { first: number; count: number }>();
   private readonly fillers: readonly string[];
   private readonly rushedAboveWpm: number;
+  private readonly latencyMs: number;
 
   constructor(opts: TimelineOptions = {}) {
     this.fillers = opts.fillers ?? DEFAULT_FILLERS;
     this.rushedAboveWpm = opts.rushedAboveWpm ?? Infinity;
+    this.latencyMs = opts.latencyMs ?? 500;
   }
 
   private get lastEndMs(): number {
@@ -90,10 +97,12 @@ export class TranscriptTimeline {
 
   private place(texts: string[], nowMs: number, voiced: readonly VoicedInterval[], wpm: number | null): void {
     if (texts.length === 0) return;
+    // Speech in the last latencyMs is (most likely) the next words, still being transcribed.
+    const until = Math.max(this.lastEndMs + 1, nowMs - this.latencyMs);
     const times = placeWords(
       texts.map((t) => Math.max(1, t.length)),
       this.lastEndMs,
-      nowMs,
+      until,
       voiced
     );
     texts.forEach((text, i) => this.words.push({ text, ...times[i], wpmAtArrival: wpm }));
@@ -136,6 +145,11 @@ export class TranscriptTimeline {
 
   getWords(): readonly TimedWord[] {
     return this.words;
+  }
+
+  /** End of the latest transcribed word: how far the transcript has caught up. */
+  frontierMs(): number | null {
+    return this.words.length ? this.words[this.words.length - 1].endMs : null;
   }
 
   wordStarts(): number[] {

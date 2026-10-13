@@ -55,8 +55,15 @@ export class PaceMeter {
     private readonly tauMs = 1200
   ) {}
 
-  update(wordStartsMs: readonly number[], nowMs: number): number {
-    const raw = windowWpm(wordStartsMs, nowMs, this.windowMs);
+  /**
+   * @param nowMs the clock, which drives the smoothing
+   * @param windowEndMs where the pace window ends: the end of the latest transcribed word.
+   *   Transcription lags speech, so a window ending at `nowMs` would always look too slow.
+   */
+  update(wordStartsMs: readonly number[], nowMs: number, windowEndMs = nowMs): number {
+    // Nothing to measure yet: don't start smoothing from zero.
+    if (wordStartsMs.length === 0) return this.value ?? 0;
+    const raw = windowWpm(wordStartsMs, windowEndMs, this.windowMs);
     if (this.value === null || this.lastMs === null) {
       this.value = raw;
     } else {
