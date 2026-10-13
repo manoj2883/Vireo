@@ -307,6 +307,16 @@ export class LiveSessionEngine {
     };
   }
 
+  /** Leave without a result: release the mic, camera and connection. Nothing is saved. */
+  async abort(): Promise<void> {
+    if (this.ended) return;
+    this.ended = true;
+    if (this.timer) clearInterval(this.timer);
+    this.timer = null;
+    this.client?.close();
+    await this.media?.stop().catch(() => {});
+  }
+
   get isEnded(): boolean {
     return this.ended;
   }

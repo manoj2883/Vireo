@@ -8,8 +8,8 @@ import { FieldNotesPage } from '@/pages/FieldNotesPage';
 import { StoriesPage } from '@/pages/StoriesPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 
-// The existing session screen (camera, Gemini Live, teardown). Replaced in Phase 5.
-const LegacySession = lazy(() => import('@/legacy/LegacyApp'));
+// The live session pulls in the audio worklet and media code; load it only when needed.
+const LivePage = lazy(() => import('@/pages/LivePage').then((m) => ({ default: m.LivePage })));
 
 export function AppRoutes() {
   return (
@@ -25,7 +25,7 @@ export function AppRoutes() {
         path="/session"
         element={
           <Suspense fallback={<p className="p-8 text-ink-muted">Opening the session</p>}>
-            <LegacySession />
+            <LivePage />
           </Suspense>
         }
       />
