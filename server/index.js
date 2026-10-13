@@ -6,8 +6,6 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI } from '@google/genai';
-import { TEARDOWN_PROMPT } from './prompts/teardown.js';
 import { generateTeardown, describeProvider, TeardownError } from './llm/index.js';
 
 dotenv.config();
@@ -83,130 +81,6 @@ app.post('/api/token', (req, res) => {
   res.json({ token: sessionToken, sessionToken, expiresIn: 3600 });
 });
 
-// Teardown Endpoint
-app.post('/api/teardown', async (req, res) => {
-  console.log('[Server /api/teardown] Request received.');
-
-  if (!GEMINI_API_KEY) {
-    return res.status(500).json({ error: 'GEMINI_API_KEY missing on server' });
-  }
-
-  try {
-    const { sessionId, durationSec, mode, transcript, metrics, flatStretches, stories } = req.body;
-
-    const allWords = (transcript || [])
-      .map((t) => t.text || '')
-      .join(' ')
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean);
-
-    if (!transcript || transcript.length === 0 || allWords.length < 20) {
-      console.warn(`[Server /api/teardown] Rejecting short transcript (${allWords.length} words).`);
-      return res.status(400).json({
-        error: 'Transcript too short. Session transcript must contain at least 20 words for teardown analysis.'
-      });
-    }
-
-    const formattedTranscript = (transcript || []).map((t) => {
-      const sec = t.timestampSec || 0;
-      const m = Math.floor(sec / 60).toString().padStart(2, '0');
-      const s = Math.floor(sec % 60).toString().padStart(2, '0');
-      return `[${m}:${s}] ${t.speaker === 'user' ? 'Mano' : 'Coach'}: "${t.text}"`;
-    }).join('\n');
-
-    const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-    const promptContext = `
-System Instruction:
-${TEARDOWN_PROMPT}
-
-Target Response JSON Schema (Return strict JSON matching this structure):
-{
-  "compositeScore": 75,
-  "theOneThing": "The single highest leverage fix for next session...",
-  "scores": {
-    "storyStructure": { "score": 70, "evidenceQuote": "exact quote from transcript", "timestamp": "01:15", "explanation": "explanation" },
-    "delivery": { "score": 80, "evidenceQuote": "exact quote from transcript", "timestamp": "02:30", "explanation": "explanation" },
-    "registerPhrasing": { "score": 75, "evidenceQuote": "exact quote from transcript", "timestamp": "00:45", "explanation": "explanation" },
-    "witLightness": { "score": 60, "evidenceQuote": "exact quote from transcript", "timestamp": "03:10", "explanation": "explanation" }
-  },
-  "structureTeardown": [
-    { "storyName": "Main Story", "missingBeats": ["hook", "stakes"], "suggestedLandingLine": "compressed landing line under 12 words", "analysis": "analysis" }
-  ],
-  "deliveryTeardown": {
-    "fillerRatePerMin": 4.5,
-    "last5AvgFillerRate": 3.0,
-    "paceRunawayTimestamps": ["01:30"],
-    "missedPauseTimestamps": ["02:15"]
-  },
-  "registerTeardown": [
-    { "originalText": "imprecise phrase", "nativeAlternative1": "native option 1", "nativeAlternative2": "native option 2", "contextAndRegister": "register difference" }
-  ],
-  "lightnessTeardown": {
-    "missingBeatTimestamps": ["02:00"],
-    "suggestedBitLine": "reusable bit line"
-  },
-  "tomorrowDrill": "10-minute specific drill description"
-}
-
-SESSION INPUT DATA:
-Mode: ${mode}
-Duration: ${durationSec} seconds
-
-Timestamped Transcript:
-${formattedTranscript}
-
-Delivery Metrics: ${JSON.stringify(metrics || {})}
-Flat-Stretch Drop-Off Windows: ${JSON.stringify(flatStretches || [])}
-Relevant Story Bank Entries: ${JSON.stringify(stories || [])}
-`;
-
-    console.log('[Server /api/teardown] Calling Gemini 3.6 Flash text model...');
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: promptContext,
-      config: {
-        responseMimeType: 'application/json',
-      },
-    });
-
-    let rawText = response.text || '{}';
-    rawText = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```$/i, '').trim();
-    const teardownData = JSON.parse(rawText);
-
-    const unverifiedScores = [];
-    const cleanTranscript = formattedTranscript.toLowerCase();
-
-    if (teardownData.scores) {
-      for (const [dim, scoreObj] of Object.entries(teardownData.scores)) {
-        if (scoreObj && scoreObj.evidenceQuote) {
-          const cleanQuote = scoreObj.evidenceQuote.toLowerCase().trim();
-          if (cleanQuote.length > 0 && !cleanTranscript.includes(cleanQuote)) {
-            unverifiedScores.push({
-              dimension: dim,
-              reason: 'Evidence quote not found as substring of actual session transcript',
-              attemptedQuote: scoreObj.evidenceQuote,
-            });
-            delete teardownData.scores[dim];
-          }
-        }
-      }
-    }
-    teardownData.unverifiedScores = unverifiedScores;
-
-    teardownData.id = 'td_' + Date.now();
-    teardownData.sessionId = sessionId || 'sess_' + Date.now();
-    teardownData.createdAt = new Date().toISOString();
-    teardownData.mode = mode || 'rehearsal';
-    teardownData.durationSec = durationSec || 0;
-
-    res.json(teardownData);
-  } catch (err) {
-    console.error('[Server /api/teardown Error]:', err.message);
-    res.status(500).json({ error: 'Failed to generate teardown report: ' + err.message });
-  }
-});
-
 // Field notes endpoint: provider-agnostic teardown (LLM_PROVIDER = gemini | openrouter | anthropic)
 app.post('/api/field-notes', async (req, res) => {
   const { sessionId, transcript, context } = req.body ?? {};
@@ -271,7 +145,7 @@ const wss = new WebSocketServer({ server, path: '/ws/live' });
 wss.on('connection', (clientWs, req) => {
   const urlParams = new URLSearchParams(req.url.split('?')[1]);
   const token = urlParams.get('token');
-  const mode = urlParams.get('mode') || 'rehearsal';
+  const mode = urlParams.get('mode') === 'coach' ? 'coach' : 'watch';
 
   // Auth validation - REJECT if token is missing or invalid
   if (!token || !validSessionTokens.has(token)) {
@@ -313,16 +187,12 @@ wss.on('connection', (clientWs, req) => {
       let responseModalities = ["AUDIO"];
       let systemPromptText = "";
 
-      if (mode === 'watch') {
-        // New app, "Watch silently": Gemini only transcribes. The device measures pace, fillers and pauses.
-        systemPromptText = "You are Vireo, a silent speech coach. Listen and transcribe only. Never speak, never reply, never comment.";
-      } else if (mode === 'coach') {
-        // New app, "Coach me out loud": the device decides when to nudge and sends [NUDGE] messages.
+      if (mode === 'coach') {
+        // "Coach me out loud": the device decides when to nudge and sends [NUDGE] messages.
         systemPromptText = "You are Vireo's voice. Stay silent while the speaker talks: do not reply, comment or answer questions. Only when you receive a message that starts with [NUDGE], say the words after it out loud, exactly as written, briefly and warmly, then go silent again.";
-      } else if (mode === 'live') {
-        systemPromptText = "You are Vireo, silent speech coach. Observe the talk and output transcript only. Do not generate conversational audio responses.";
       } else {
-        systemPromptText = "You are running a rehearsal with Mano. Camera and mic are on. You may interrupt when he buries point, abstracts, or exceeds 180 WPM.";
+        // "Watch silently": Gemini only transcribes. The device measures pace, fillers and pauses.
+        systemPromptText = "You are Vireo, a silent speech coach. Listen and transcribe only. Never speak, never reply, never comment.";
       }
 
       if (carriedContext) {
@@ -364,6 +234,13 @@ wss.on('connection', (clientWs, req) => {
       try {
         const responseString = data.toString();
         const jsonResponse = JSON.parse(responseString);
+
+        const heard = jsonResponse.serverContent?.inputTranscription?.text;
+        if (heard) {
+          // Carried into the next chunk if the session reconnects.
+          contextHistory.push(`Speaker: ${heard}`);
+          if (contextHistory.length > 200) contextHistory.splice(0, contextHistory.length - 200);
+        }
 
         if (jsonResponse.serverContent?.modelTurn?.parts) {
           for (const part of jsonResponse.serverContent.modelTurn.parts) {
@@ -424,9 +301,6 @@ wss.on('connection', (clientWs, req) => {
         return;
       }
 
-      if (parsed.type === 'transcript_user_text') {
-        contextHistory.push(`Mano: ${parsed.text}`);
-      }
 
       if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
         geminiWs.send(msgStr);
