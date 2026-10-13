@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ConnectionStatus, SessionMode, TeardownReport, Story } from './types';
-import { LiveStreamService } from './services/liveStreamService';
-import { MetricsEngine, MetricSnapshot } from './utils/metricsEngine';
-import { detectFlatStretches, FlatStretchWindow, TranscriptEntry } from './utils/retentionEngine';
-import { RehearsalEngine, InterruptionEvent } from './services/rehearsalService';
-import { LiveModeHUD } from './components/LiveModeHUD';
-import { TeardownView } from './components/TeardownView';
-import { StoryBank } from './components/StoryBank';
-import { BitBank } from './components/BitBank';
-import { SessionHistoryView } from './components/SessionHistoryView';
-import { WaveformVisualizer } from './components/WaveformVisualizer';
-import { getAllStories, saveTeardown, getAllTeardowns, saveSession, StoredSession } from './services/db';
+import { ConnectionStatus, SessionMode, TeardownReport, Story } from '../types';
+import { LiveStreamService } from '../services/liveStreamService';
+import { MetricsEngine, MetricSnapshot } from '../utils/metricsEngine';
+import { detectFlatStretches, FlatStretchWindow, TranscriptEntry } from '../utils/retentionEngine';
+import { RehearsalEngine, InterruptionEvent } from '../services/rehearsalService';
+import { LiveModeHUD } from '../components/LiveModeHUD';
+import { TeardownView } from '../components/TeardownView';
+import { StoryBank } from '../components/StoryBank';
+import { BitBank } from '../components/BitBank';
+import { SessionHistoryView } from '../components/SessionHistoryView';
+import { WaveformVisualizer } from '../components/WaveformVisualizer';
+import { getAllStories, saveTeardown, getAllTeardowns, saveSession, StoredSession } from '../services/db';
 
 import {
   Mic,
