@@ -1,0 +1,214 @@
+{
+  "audio": {
+    "synthetic": true
+  },
+  "notes": "Synthetic example so the harness runs out of the box. Replace with real recordings.",
+  "words": [
+    {
+      "text": "So",
+      "startMs": 500,
+      "endMs": 720
+    },
+    {
+      "text": "my",
+      "startMs": 790,
+      "endMs": 990
+    },
+    {
+      "text": "research",
+      "startMs": 1060,
+      "endMs": 1480
+    },
+    {
+      "text": "is",
+      "startMs": 1550,
+      "endMs": 1710
+    },
+    {
+      "text": "about",
+      "startMs": 1780,
+      "endMs": 2080
+    },
+    {
+      "text": "teaching",
+      "startMs": 2150,
+      "endMs": 2550
+    },
+    {
+      "text": "AI",
+      "startMs": 2620,
+      "endMs": 2920
+    },
+    {
+      "text": "systems",
+      "startMs": 2990,
+      "endMs": 3410
+    },
+    {
+      "text": "to",
+      "startMs": 3480,
+      "endMs": 3620
+    },
+    {
+      "text": "say",
+      "startMs": 3690,
+      "endMs": 3950
+    },
+    {
+      "text": "no.",
+      "startMs": 4020,
+      "endMs": 4420
+    },
+    {
+      "text": "Um,",
+      "startMs": 5790,
+      "endMs": 6240
+    },
+    {
+      "text": "when",
+      "startMs": 6310,
+      "endMs": 6550
+    },
+    {
+      "text": "they",
+      "startMs": 6620,
+      "endMs": 6820
+    },
+    {
+      "text": "dont",
+      "startMs": 6890,
+      "endMs": 7150
+    },
+    {
+      "text": "have",
+      "startMs": 7220,
+      "endMs": 7440
+    },
+    {
+      "text": "the",
+      "startMs": 7510,
+      "endMs": 7650
+    },
+    {
+      "text": "evidence,",
+      "startMs": 7720,
+      "endMs": 8280
+    },
+    {
+      "text": "you",
+      "startMs": 9050,
+      "endMs": 9230
+    },
+    {
+      "text": "know,",
+      "startMs": 9300,
+      "endMs": 9620
+    },
+    {
+      "text": "the",
+      "startMs": 9690,
+      "endMs": 9810
+    },
+    {
+      "text": "answers",
+      "startMs": 9880,
+      "endMs": 10180
+    },
+    {
+      "text": "it",
+      "startMs": 10250,
+      "endMs": 10350
+    },
+    {
+      "text": "refused",
+      "startMs": 10420,
+      "endMs": 10700
+    },
+    {
+      "text": "were",
+      "startMs": 10770,
+      "endMs": 10910
+    },
+    {
+      "text": "like",
+      "startMs": 10980,
+      "endMs": 11200
+    },
+    {
+      "text": "the",
+      "startMs": 11270,
+      "endMs": 11370
+    },
+    {
+      "text": "right",
+      "startMs": 11440,
+      "endMs": 11620
+    },
+    {
+      "text": "ones.",
+      "startMs": 11690,
+      "endMs": 12050
+    },
+    {
+      "text": "Next",
+      "startMs": 13020,
+      "endMs": 13320
+    },
+    {
+      "text": "I",
+      "startMs": 13390,
+      "endMs": 13510
+    },
+    {
+      "text": "want",
+      "startMs": 13580,
+      "endMs": 13840
+    },
+    {
+      "text": "to",
+      "startMs": 13910,
+      "endMs": 14030
+    },
+    {
+      "text": "measure",
+      "startMs": 14100,
+      "endMs": 14480
+    },
+    {
+      "text": "trust.",
+      "startMs": 14550,
+      "endMs": 15070
+    }
+  ],
+  "fillers": [
+    {
+      "text": "Um,",
+      "startMs": 5790,
+      "endMs": 6240
+    },
+    {
+      "text": "you know,",
+      "startMs": 9050,
+      "endMs": 9620
+    },
+    {
+      "text": "like",
+      "startMs": 10980,
+      "endMs": 11200
+    }
+  ],
+  "pauses": [
+    {
+      "startMs": 4490,
+      "endMs": 5790
+    },
+    {
+      "startMs": 8350,
+      "endMs": 9050
+    },
+    {
+      "startMs": 12120,
+      "endMs": 13020
+    }
+  ]
+}

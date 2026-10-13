@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "eval": "vite-node eval/run.ts",
+    "eval:import": "vite-node eval/import-audacity.ts"
   },
   "dependencies": {
     "@radix-ui/react-slot": "^1.5.0",
