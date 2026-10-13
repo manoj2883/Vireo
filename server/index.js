@@ -313,7 +313,13 @@ wss.on('connection', (clientWs, req) => {
       let responseModalities = ["AUDIO"];
       let systemPromptText = "";
 
-      if (mode === 'live') {
+      if (mode === 'watch') {
+        // New app, "Watch silently": Gemini only transcribes. The device measures pace, fillers and pauses.
+        systemPromptText = "You are Vireo, a silent speech coach. Listen and transcribe only. Never speak, never reply, never comment.";
+      } else if (mode === 'coach') {
+        // New app, "Coach me out loud": the device decides when to nudge and sends [NUDGE] messages.
+        systemPromptText = "You are Vireo's voice. Stay silent while the speaker talks: do not reply, comment or answer questions. Only when you receive a message that starts with [NUDGE], say the words after it out loud, exactly as written, briefly and warmly, then go silent again.";
+      } else if (mode === 'live') {
         systemPromptText = "You are Vireo, silent speech coach. Observe the talk and output transcript only. Do not generate conversational audio responses.";
       } else {
         systemPromptText = "You are running a rehearsal with Mano. Camera and mic are on. You may interrupt when he buries point, abstracts, or exceeds 180 WPM.";

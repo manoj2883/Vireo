@@ -1,7 +1,8 @@
 /**
- * AudioWorklet: estimates pitch from the microphone every ~21 ms (1024 frames at 48 kHz)
- * over a ~43 ms window, after downsampling to about 16 kHz to keep the work small.
- * Posts { frame, hz } where frame is the AudioContext frame of the window's end.
+ * AudioWorklet: every ~21 ms (1024 frames at 48 kHz) posts the loudness of that hop and a
+ * pitch estimate over the last ~43 ms, downsampled to about 16 kHz to keep the work small.
+ * Posts { frame, hz, rms, hopFrames } where frame is the AudioContext frame of the hop's end.
+ * One worklet feeds both the sonogram's pitch and the pause detector.
  */
 import { decimate, estimatePitch } from './autocorrelate';
 
@@ -22,6 +23,7 @@ class PitchProcessor extends AudioWorkletProcessor {
   private ring = new Float32Array(WINDOW);
   private filled = 0;
   private sinceLast = 0;
+  private hopSumSquares = 0;
   private factor = Math.max(1, Math.floor(sampleRate / 16000));
 
   process(inputs: Float32Array[][]): boolean {
@@ -34,11 +36,15 @@ class PitchProcessor extends AudioWorkletProcessor {
     this.ring.set(channel, WINDOW - n);
     this.filled = Math.min(WINDOW, this.filled + n);
     this.sinceLast += n;
+    for (let i = 0; i < n; i++) this.hopSumSquares += channel[i] * channel[i];
 
-    if (this.filled === WINDOW && this.sinceLast >= HOP) {
+    if (this.sinceLast >= HOP) {
+      const hopFrames = this.sinceLast;
+      const rms = Math.sqrt(this.hopSumSquares / hopFrames);
       this.sinceLast = 0;
-      const hz = estimatePitch(decimate(this.ring, this.factor), sampleRate / this.factor);
-      this.port.postMessage({ frame: currentFrame + n, hz });
+      this.hopSumSquares = 0;
+      const hz = this.filled === WINDOW ? estimatePitch(decimate(this.ring, this.factor), sampleRate / this.factor) : null;
+      this.port.postMessage({ frame: currentFrame + n, hz, rms, hopFrames });
     }
     return true;
   }

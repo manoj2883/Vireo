@@ -14,16 +14,22 @@ export class AudioRecorder {
     this.onAudioDataCallback = onAudioData;
   }
 
-  public async start(): Promise<void> {
-    this.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: {
-        channelCount: 1,
-        sampleRate: 16000,
-        echoCancellation: true,
-        noiseSuppression: true,
-        autoGainControl: true,
-      },
-    });
+  private ownsStream = true;
+
+  /** Pass an existing microphone stream to share it; otherwise the recorder opens its own. */
+  public async start(existingStream?: MediaStream): Promise<void> {
+    this.ownsStream = !existingStream;
+    this.mediaStream =
+      existingStream ??
+      (await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      }));
 
     const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
     this.audioContext = new AudioContextClass();
@@ -75,7 +81,7 @@ export class AudioRecorder {
       this.analyser = null;
     }
     if (this.mediaStream) {
-      this.mediaStream.getTracks().forEach((track) => track.stop());
+      if (this.ownsStream) this.mediaStream.getTracks().forEach((track) => track.stop());
       this.mediaStream = null;
     }
     if (this.audioContext && this.audioContext.state !== 'closed') {
