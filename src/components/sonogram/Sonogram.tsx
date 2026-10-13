@@ -5,6 +5,13 @@ import { usePrefersReducedMotion } from '@/lib/usePrefersReducedMotion';
 import { describeSonogram, layoutSonogram, type TimeWindow } from './geometry';
 import type { AnnotationTone, PauseSpan, SonogramAnnotation, SonogramMode, SonogramVariant, WordSegment } from './types';
 
+export interface SonogramPin {
+  key: string;
+  atMs: number;
+  tone: 'olive' | 'amber';
+  selected?: boolean;
+}
+
 export interface SonogramProps {
   segments: readonly WordSegment[];
   pauses?: readonly PauseSpan[];
@@ -25,8 +32,14 @@ export interface SonogramProps {
   /** Change to replay the reveal. */
   revealKey?: string | number;
   onRevealComplete?: () => void;
-  /** Overrides the generated screen-reader description. */
+  /** Overrides the generated screen-reader description. An empty string makes it decorative. */
   label?: string;
+  /** Field-note pins: a line and dot at each note's moment. The selected one stands taller. */
+  pins?: readonly SonogramPin[];
+  /** Text shown above the selected pin. */
+  selectedPinLabel?: string;
+  showWordLabels?: boolean;
+  showTimeAxis?: boolean;
   className?: string;
 }
 
@@ -58,6 +71,10 @@ export function Sonogram({
   revealKey,
   onRevealComplete,
   label,
+  pins = [],
+  selectedPinLabel,
+  showWordLabels = true,
+  showTimeAxis = false,
   className,
 }: SonogramProps) {
   const resolvedVariant: SonogramVariant = variant ?? (mode === 'scrolling' ? 'ribbon' : 'hero');
@@ -128,8 +145,9 @@ export function Sonogram({
       width={legibleWidth ? width : '100%'}
       height={scrolling ? '100%' : undefined}
       preserveAspectRatio={scrolling ? 'none' : 'xMidYMid meet'}
-      role="img"
-      aria-label={description}
+      role={label === '' ? undefined : 'img'}
+      aria-label={label === '' ? undefined : description}
+      aria-hidden={label === '' ? true : undefined}
       className={cn('block', !legibleWidth && className)}
       data-mode={mode}
       data-variant={resolvedVariant}
@@ -188,7 +206,7 @@ export function Sonogram({
             data-harmonic={s.harmonic}
           />
         ))}
-        {layout.labels.map((l) => (
+        {showWordLabels && layout.labels.map((l) => (
           <text
             key={`label-${l.wordIndex}`}
             x={l.x}
@@ -225,6 +243,41 @@ export function Sonogram({
             </g>
           ))}
         </motion.g>
+      )}
+
+      {showTimeAxis &&
+        spec.axis &&
+        layout.ticks.map((t) => (
+          <text key={t.label} x={t.x} y={spec.axis!.baselineY + 24} textAnchor="middle" fontSize={13} className="fill-ink-muted font-sans" aria-hidden="true">
+            {t.label}
+          </text>
+        ))}
+
+      {pins.length > 0 && spec.axis && (
+        <g aria-hidden="true" data-testid="pins">
+          {pins.map((p) => {
+            const x = layout.xAt(p.atMs);
+            const top = p.selected ? spec.axis!.top - 10 : spec.axis!.top + 14;
+            return (
+              <g key={p.key} data-selected={p.selected || undefined}>
+                <line x1={x} y1={top} x2={x} y2={spec.axis!.baselineY} className={p.selected ? 'stroke-ink' : p.tone === 'olive' ? 'stroke-olive' : 'stroke-amber'} strokeWidth={p.selected ? 2 : 1.2} />
+                <circle cx={x} cy={top} r={p.selected ? 7 : 5} className={p.selected ? 'fill-ink' : p.tone === 'olive' ? 'fill-olive' : 'fill-amber'} />
+              </g>
+            );
+          })}
+          {selectedPinLabel &&
+            (() => {
+              const sel = pins.find((p) => p.selected);
+              if (!sel) return null;
+              const x = layout.xAt(sel.atMs);
+              const anchor = x < width * 0.25 ? 'start' : x > width * 0.75 ? 'end' : 'middle';
+              return (
+                <text x={x} y={spec.axis!.top - 26} textAnchor={anchor} fontSize={22} className="fill-ink font-display italic">
+                  {selectedPinLabel}
+                </text>
+              );
+            })()}
+        </g>
       )}
 
       {mode === 'reveal' && (

@@ -178,10 +178,19 @@ export interface AnnotationMark {
   bracket: string;
 }
 
+export interface TimeTick {
+  x: number;
+  label: string;
+}
+
 export interface SonogramLayout {
   width: number;
   height: number;
   window: TimeWindow;
+  /** Maps a time on the session clock to x. */
+  xAt: (ms: number) => number;
+  /** Time-axis ticks under the baseline (variants with an axis). */
+  ticks: TimeTick[];
   spec: VariantSpec;
   words: WordBox[];
   strokes: Stroke[];
@@ -436,7 +445,16 @@ export function layoutSonogram(input: LayoutInput): SonogramLayout {
     }
   }
 
-  return { width, height, window: win, spec, words, strokes, labels, pauses: pauseMarks, annotations };
+  const ticks: TimeTick[] = [];
+  if (spec.axis) {
+    const step = span <= 60_000 ? 10_000 : span <= 180_000 ? 30_000 : 60_000;
+    for (let t = Math.ceil(win.startMs / step) * step; t <= win.endMs; t += step) {
+      const sec = Math.round(t / 1000);
+      ticks.push({ x: xAt(t), label: `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}` });
+    }
+  }
+
+  return { width, height, window: win, xAt, ticks, spec, words, strokes, labels, pauses: pauseMarks, annotations };
 }
 
 /** Plain-language summary for screen readers. */
