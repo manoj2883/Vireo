@@ -215,7 +215,7 @@ describe('GeminiLiveClient', () => {
     expect(cb.onCoachAudio).not.toHaveBeenCalled();
 
     expect(client.sendNudge('Slow down.')).toBe(true);
-    expect(sent.at(-1)).toEqual({ clientContent: { turns: [{ role: 'user', parts: [{ text: '[NUDGE] Slow down.' }] }], turnComplete: true } });
+    expect(sent[sent.length - 1]).toEqual({ clientContent: { turns: [{ role: 'user', parts: [{ text: '[NUDGE] Slow down.' }] }], turnComplete: true } });
     receive(audio);
     receive({ serverContent: { turnComplete: true } });
     receive(audio);
