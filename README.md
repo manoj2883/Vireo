@@ -1,109 +1,105 @@
-# 🎙️ Vireo — AI Speech & Delivery Coach
+# Vireo
 
-**Vireo** is a real-time AI speech and delivery coach powered by the **Google Gemini Live API** (Multimodal WebSockets for live video, audio PCM, and real-time speech analysis) and **Gemini 3.6 Flash** (for comprehensive post-speech teardown reports).
+**A field guide to your voice.** Ornithologists draw birdsong as sonograms. Vireo draws your speech the same way while you practise, and pins field-guide notes to the moments that matter: a filler, a rushed result, a pause that landed. Every note quotes the exact words you said.
 
-> 🐦 **Why "Vireo"?**
-> Named after the North American songbird known for its clear, melodious, and persistent singing. **Vireo** symbolizes articulate, confident, and engaging speech — empowering speakers to master their vocal delivery, cadence, and storytelling.
+![Field notes: verdict, scores against your best, and the whole answer drawn as a sonogram with a note pinned to its moment](docs/media/field-notes.png)
 
----
+<!-- Live-session GIF goes here: docs/media/live-session.gif (see "Recording the demo" below). -->
 
-## 🚀 Quick Links & Local Testing URLs
+| Launch page | Home |
+| :---: | :---: |
+| ![Launch page with the animated sonogram hero](docs/media/launch.png) | ![Home with progress built from real sessions](docs/media/home.png) |
 
-When running locally (`npm run start`), access the services at:
+> **Why "Vireo"?** The vireo is a North American songbird that sings the same clear phrase hundreds of times a day. That's the whole training plan.
 
-| Component | URL | Description |
+## What it does
+
+- **Live cues you can glance at.** A pace dot drifts through your target zone and grows a ring when you rush. A ring fills while you hold a pause. Fillers leave small triangle marks that fade. Your speech scrolls past as a sonogram ribbon.
+- **Two coaching modes.** *Watch silently* shows visual cues only. *Coach me out loud* adds a short spoken nudge, but only after your pace has been out of the zone for more than five seconds.
+- **Field notes, backed by evidence.** After each session you get a verdict, structure, delivery and clarity scores compared with your best, the whole answer drawn with notes pinned to it, a story map, keep and fix notes beside the transcript, and drills. The server checks every quote against your transcript and drops any note it can't back up.
+- **Audience mode.** Vireo asks the follow-up a sharp listener would ask, and *Answer it now* starts a short session on it.
+- **Story Bank.** Keep the stories you tell often, with their key points. Rehearse one and Vireo checks which points you hit.
+- **Ghost pace.** A faint dot replays your best take of the same prompt, so each rehearsal is a race against yourself.
+- **Private by design.** Video is never stored, and sessions stay in your browser. See [Privacy](#privacy).
+
+## How it works
+
+```mermaid
+flowchart LR
+  subgraph Browser["Browser (React + TypeScript)"]
+    Mic[Microphone] --> Worklet["AudioWorklet<br/>pitch + loudness every ~21 ms"]
+    Worklet --> VAD["Pause detector<br/>energy + hangover, pauses > 300 ms"]
+    Mic --> PCM["16 kHz PCM uplink"]
+    Cam[Camera, 1 frame a second] --> Uplink
+    PCM --> Uplink[WebSocket]
+    Uplink -->|transcript chunks| Timeline["Transcript timeline<br/>words placed into heard speech"]
+    VAD --> Timeline
+    Timeline --> Metrics["Pace (4 s window) · fillers · nudges · ghost pace"]
+    Metrics --> HUD["Live screen<br/>sonogram ribbon, pace band, pause ring"]
+    Metrics --> Store[(IndexedDB<br/>sessions, notes, Story Bank)]
+    Store --> Notes[Field notes screen]
+  end
+  subgraph Server["Node server (Express + ws)"]
+    Proxy[/ws/live proxy/]
+    Api["/api/field-notes<br/>Zod-validated, evidence-checked"]
+  end
+  Uplink <--> Proxy
+  Proxy <--> Gemini["Gemini Live<br/>transcription, spoken nudges"]
+  Notes -->|transcript + metrics| Api
+  Api --> LLM["LLM_PROVIDER<br/>Gemini · Claude · OpenRouter"]
+```
+
+Pace, pauses, fillers and pitch are measured on your device. Gemini Live only transcribes and, in coach mode, speaks the nudges the browser asks for. Field notes come from the model you configure. Their JSON is validated against a schema and retried once if invalid, and every quote is matched against the transcript before it reaches the screen.
+
+| Path | What's there |
+| :--- | :--- |
+| `src/components/sonogram/` | The sonogram renderer: pure geometry plus static, reveal and scrolling modes |
+| `src/live/` | Live session engine, on-device metrics (`metrics/`) and the Gemini Live client |
+| `src/audio/pitch/` | Autocorrelation pitch estimate in an AudioWorklet |
+| `src/pages/` | Launch, Home, Warm-up, Live, Field notes and Story Bank screens |
+| `src/storage/` | IndexedDB storage, deletion, and the one-time import from the previous version |
+| `server/app.js`, `server/index.js` | HTTP API, and the WebSocket proxy to Gemini Live |
+| `server/llm/` | Provider-agnostic field notes (`generateTeardown`), schema and evidence check |
+| `eval/` | Accuracy harness for the on-device metrics |
+| `docs/design/` | Design system tokens and the screen designs this build follows |
+
+## Getting started
+
+You need Node.js 20 or newer and a [Gemini API key](https://aistudio.google.com/) for live sessions.
+
+```bash
+npm install
+cd server && npm install && cd ..
+cp .env.example .env     # then add your keys
+npm run start            # server on :3001, app on http://localhost:5173
+```
+
+On Windows, `start.ps1` or `start.bat` do the same.
+
+### Choosing the field notes provider
+
+Live sessions always use Gemini Live (`GEMINI_API_KEY`). Field notes can come from any of three providers:
+
+| `LLM_PROVIDER` | Also set | Notes |
 | :--- | :--- | :--- |
-| **Web UI (Frontend)** | [`http://localhost:5173`](http://localhost:5173) | Interactive React + TypeScript user interface |
-| **Backend Server** | [`http://localhost:3001`](http://localhost:3001) | Express REST API & session token authentication |
-| **Health Check** | [`http://localhost:3001/api/health`](http://localhost:3001/api/health) | Verifies server status & API key configuration |
-| **WebSocket Stream** | `ws://localhost:3001/ws/live` | Live WebSocket endpoint proxying to Gemini Live API |
+| `gemini` (default) | `GEMINI_API_KEY` | Optional `GEMINI_TEARDOWN_MODEL` (default `gemini-3.6-flash`). JSON is constrained to the field notes schema. |
+| `anthropic` | `ANTHROPIC_API_KEY`, optional `ANTHROPIC_MODEL` (default `claude-opus-5-5`) | Structured outputs. Server-side refusal fallback is on by default; set `ANTHROPIC_FALLBACKS=off` to disable. Optional `ANTHROPIC_EFFORT`. |
+| `openrouter` | `OPENROUTER_API_KEY`, `OPENROUTER_MODELS` | Comma-separated model IDs in fallback order, sent as OpenRouter's `models` array. Free models rotate and get rate-limited, so list several. Nothing is hardcoded. |
 
----
+`GET /api/health` reports whether the live key and the field notes provider are configured.
 
-## 🛠️ Codebase Language Breakdown
-
-- **Client (`src/`)**: **100% TypeScript** (`.ts`, `.tsx`) with strict type definitions (`src/types/index.ts`).
-- **Server (`server/`)**: **Node.js (ESM JavaScript)** with Express, `@google/genai` SDK, and native WebSocket proxying.
-- **Styling**: Tailwind CSS with custom dark mode UI.
-
----
-
-## ✨ Features
-
-- 📹 **Live Media Streaming**: Captures camera video at 1 FPS (JPEG) and microphone audio at 16kHz PCM, sending real-time bi-directional chunks to Gemini Live.
-- ⏱️ **Realtime Speech HUD**: Live feedback on speech pace (WPM), filler word rate, and structural pauses.
-- 🤫 **Silent Live Mode & Active Rehearsal Mode**:
-  - **Live Mode**: Silent coach that observes and transcribes without interrupting audio output.
-  - **Rehearsal Mode**: Active voice coach that provides instant feedback when pacing exceeds thresholds.
-- 📊 **Post-Session Teardown Analysis**: Powered by `gemini-3.6-flash`, analyzing speech structure, register/phrasing, wit/lightness, and generating actionable daily drills with exact transcript evidence verification.
-- 🔄 **Transparent 15-Minute Session Chunking**: Automatically carries over conversation history across long-running sessions without dropping context.
-
----
-
-## ⚙️ Getting Started
-
-### 1. Prerequisites
-- Node.js `v18+` or `v20+`
-- A valid **Google Gemini API Key** ([Get your API key on Google AI Studio](https://aistudio.google.com/))
-
-### 2. Environment Setup
-Create a `.env` file in the root directory:
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-PORT=3001
-```
-
-### 3. Installation
-Install root dependencies:
-```bash
-npm install
-```
-
-Install server dependencies:
-```bash
-cd server
-npm install
-cd ..
-```
-
-### 4. Running the Application
-To launch both the backend server and frontend development server simultaneously:
+### Checks
 
 ```bash
-npm run start
+npm run check     # type check, lint and tests (server, app and eval)
+npm run eval      # accuracy of the on-device metrics against labelled recordings
 ```
 
-This will run:
-- **Express Backend**: Listening on `http://localhost:3001`
-- **Vite Dev Frontend**: Serving at `http://localhost:5173`
+## Accuracy
 
-Open [`http://localhost:5173`](http://localhost:5173) in your browser, allow camera and microphone permissions, and start your coaching session!
+`npm run eval` replays hand-labelled recordings through the same voice detector, transcript timeline and pace meter a live session uses. It prints **filler precision and recall**, **WPM mean absolute error** and **pause F1** for each recording and overall. The label format and an Audacity labelling workflow are in [`eval/README.md`](eval/README.md). A synthetic example runs out of the box. It's a sanity check, not a benchmark: real numbers need real recordings.
 
----
-
-## 🏗️ Project Architecture
-
-```
-vireo/
-├── server/                   # Node.js WebSocket & Express Backend
-│   ├── index.js              # Server entry point, Gemini Live WSS proxy & teardown endpoint
-│   ├── prompts/              # Teardown & coaching system prompts
-│   └── package.json
-├── src/                      # 100% TypeScript React Frontend
-│   ├── components/           # React Components (HUD, Story Bank, Bit Bank, Teardown)
-│   ├── services/             # Live stream service & WebSockets management
-│   ├── utils/                # Speech metrics engine, audio processor & video processor
-│   ├── types/                # TypeScript interface and type declarations
-│   ├── App.tsx               # Main application component
-│   └── main.tsx              # React entry point
-├── vite.config.ts            # Vite build configuration & WSS proxy rules
-├── tsconfig.json             # TypeScript compiler settings
-└── package.json              # Project scripts & dependencies
-```
-
----
-
-## 🔒 Privacy
+## Privacy
 
 Vireo measures as much as it can on your device, and is explicit about what it sends where.
 
@@ -129,6 +125,14 @@ Each provider handles what it receives under its own terms. Check them for the a
 - **Delete session** on any field notes page removes its transcript, drawing, notes and ghost pace take.
 - **Delete all data** on Home removes every session, note and story, plus the previous version's database, from this browser.
 
-## 📜 License
+## Deploying
 
-MIT License
+The `Dockerfile` builds the front end and serves it from the Node server on one port. `render.yaml` is a [Render](https://render.com) blueprint for that image: create a Blueprint from this repo, then add your keys as environment variables in the dashboard. Any host that runs a Docker container with WebSocket support works the same way.
+
+## Recording the demo
+
+The GIF at the top should show a real live session. Run the app with a Gemini key, start a session in a browser, and screen-record about ten seconds, ideally while saying a filler, holding a pause and rushing a sentence. Save it as `docs/media/live-session.gif`.
+
+## License
+
+MIT. Made by Manoj Kumar Gangineni.
