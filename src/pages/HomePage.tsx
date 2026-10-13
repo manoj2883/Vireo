@@ -4,6 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/theme/ThemeProvider';
 import { THEME_NAMES } from '@/theme/themes';
+import { Sonogram } from '@/components/sonogram';
+import { LiveRibbonDemo } from '@/components/sonogram/LiveRibbonDemo';
+import { DEMO_ANNOTATIONS, DEMO_LABEL, DEMO_PAUSES, DEMO_SEGMENTS } from '@/components/sonogram/demo';
 
 const SWATCHES: { token: string; className: string; means: string }[] = [
   { token: 'surface-000', className: 'bg-surface-000', means: 'Page ground' },
@@ -61,6 +64,22 @@ export function HomePage() {
             </li>
           ))}
         </ul>
+
+        <div className="flex flex-col gap-6">
+          <h3 className="text-heading">Sonogram</h3>
+          <div className="rounded-lg bg-surface-100 p-4 sm:p-6">
+            <Sonogram segments={DEMO_SEGMENTS} pauses={DEMO_PAUSES} annotations={DEMO_ANNOTATIONS} label={DEMO_LABEL} />
+          </div>
+          <LiveRibbonDemo />
+          <div className="grid w-full max-w-[460px] grid-cols-2 gap-4">
+            <div className="rounded-[20px] bg-surface-100 p-[18px]">
+              <Sonogram variant="mini" segments={DEMO_SEGMENTS} pauses={DEMO_PAUSES} />
+            </div>
+            <div className="rounded-[20px] bg-surface-100 p-[18px]">
+              <Sonogram variant="mini" segments={DEMO_SEGMENTS.filter((s) => s.kind !== 'filler')} />
+            </div>
+          </div>
+        </div>
 
         <div className="grid gap-10 md:grid-cols-2">
           <div className="flex flex-col gap-4">

@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 import { VireoWordmark } from '@/components/brand/VireoMark';
 import { ThemeToggle } from '@/theme/ThemeToggle';
+import { HeroSonogram } from '@/components/sonogram/HeroSonogram';
 
 /** Launch page (`/`). The animated sonogram hero arrives with Phase 2; full page in Phase 5. */
 export function LaunchPage() {
@@ -38,6 +39,7 @@ export function LaunchPage() {
             <Link to="/app">Open Vireo</Link>
           </Button>
         </div>
+        <HeroSonogram />
       </main>
     </div>
   );
