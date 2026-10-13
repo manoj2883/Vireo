@@ -223,11 +223,15 @@ function FieldNotesView({
         {notes && (
           <div className="flex min-w-0 flex-[1_1_440px] flex-col gap-4">
             <h2 className="m-0 mb-2 font-display text-[44px] font-normal leading-[48px] tracking-[-0.02em]">Notes</h2>
+            {ordered.length === 0 && (
+              <p className="m-0 text-body text-ink-muted">Vireo couldn’t back any notes with your exact words this time, so it left them out.</p>
+            )}
             {ordered.map((n, i) => (
               <NoteCard key={i} note={n} selected={i === selected} onSelect={() => setSelected(i)} onPlay={() => playMoment(n)} segments={session.segments} />
             ))}
             <p className="m-0 text-small text-ink-muted">
               Every quote is checked word for word against your transcript before it appears. Anything Vireo can’t back up, it leaves out.
+              {notes.droppedNotes ? ` ${notes.droppedNotes} ${notes.droppedNotes === 1 ? 'note was' : 'notes were'} left out this time.` : ''}
             </p>
           </div>
         )}

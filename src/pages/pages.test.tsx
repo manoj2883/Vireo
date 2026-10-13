@@ -197,6 +197,13 @@ describe('Field notes', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
   });
 
+  it('says when notes were left out for lack of evidence', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: { ...NOTES, notes: [], droppedNotes: 2 } }));
+    renderAt('/notes/sess_1');
+    expect(await screen.findByText(/couldn’t back any notes with your exact words/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 notes were left out this time/)).toBeInTheDocument();
+  });
+
   it('saves the answer to the Story Bank', async () => {
     await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
     renderAt('/notes/sess_1');
