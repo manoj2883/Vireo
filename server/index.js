@@ -8,6 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { TEARDOWN_PROMPT } from './prompts/teardown.js';
+import { generateTeardown, describeProvider, TeardownError } from './llm/index.js';
 
 dotenv.config();
 
@@ -206,11 +207,44 @@ Relevant Story Bank Entries: ${JSON.stringify(stories || [])}
   }
 });
 
+// Field notes endpoint: provider-agnostic teardown (LLM_PROVIDER = gemini | openrouter | anthropic)
+app.post('/api/field-notes', async (req, res) => {
+  const { sessionId, transcript, context } = req.body ?? {};
+  if (!Array.isArray(transcript)) {
+    return res.status(400).json({ error: 'transcript must be an array of { speaker, text, startMs } lines.' });
+  }
+  const lines = transcript
+    .filter((t) => t && typeof t.text === 'string')
+    .map((t) => ({ speaker: t.speaker === 'coach' ? 'coach' : 'user', text: t.text, startMs: Number(t.startMs) || 0 }));
+  const spokenWords = lines
+    .filter((t) => t.speaker === 'user')
+    .reduce((n, t) => n + t.text.trim().split(/\s+/).filter(Boolean).length, 0);
+  if (spokenWords < 20) {
+    return res.status(400).json({ error: `Say at least 20 words for field notes (heard ${spokenWords}).` });
+  }
+
+  try {
+    const result = await generateTeardown(lines, context ?? {});
+    res.json({
+      sessionId: sessionId || 'sess_' + Date.now(),
+      createdAt: new Date().toISOString(),
+      provider: result.provider,
+      model: result.model,
+      ...result.notes,
+    });
+  } catch (err) {
+    const status = err instanceof TeardownError ? err.status : 500;
+    console.error('[Server /api/field-notes Error]:', err.message);
+    res.status(status).json({ error: err.message, provider: err.provider });
+  }
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     hasApiKey: Boolean(GEMINI_API_KEY && GEMINI_API_KEY.trim() !== ''),
+    fieldNotes: describeProvider(),
     timestamp: new Date().toISOString()
   });
 });
