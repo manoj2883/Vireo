@@ -103,6 +103,32 @@ vireo/
 
 ---
 
+## 🔒 Privacy
+
+Vireo measures as much as it can on your device, and is explicit about what it sends where.
+
+**Stays on your device**
+
+- **Video is never recorded or stored**, by the browser or the server.
+- Pauses, pace, fillers, pitch and loudness are computed in the browser.
+- Sessions (transcript, sonogram, metrics, field notes), your Story Bank and ghost pace are stored in this browser's IndexedDB. Nothing is kept on the server.
+
+**Leaves your device**
+
+| What | When | Goes to |
+| :--- | :--- | :--- |
+| Microphone audio (16 kHz) and one camera frame a second | During a live session | Your Vireo server, which relays it to **Google Gemini Live** for transcription. In "Coach me out loud" mode, Gemini also receives the short nudge text and speaks it back. |
+| Transcript text and timestamps, your prompt, talk type, pace zone, on-device metrics, and the chosen Story Bank outline | When field notes are written | Your Vireo server, which sends it to the provider in `LLM_PROVIDER`: **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model you choose). |
+
+The server holds a session's recent transcript in memory only while the session runs, so it can reconnect after Gemini Live's time limit. It writes no transcript text to its logs, only counts and errors.
+
+Each provider handles what it receives under its own terms. Check them for the account and tier you use: some free tiers let the provider use submitted content to improve its products.
+
+**Deleting**
+
+- **Delete session** on any field notes page removes its transcript, drawing, notes and ghost pace take.
+- **Delete all data** on Home removes every session, note and story, plus the previous version's database, from this browser.
+
 ## 📜 License
 
 MIT License

@@ -150,14 +150,6 @@ wss.on('connection', (clientWs, req) => {
       const msgStr = msg.toString();
       const parsed = JSON.parse(msgStr);
 
-      if (parsed.realtimeInput?.mediaChunks) {
-        for (const chunk of parsed.realtimeInput.mediaChunks) {
-          if (chunk.mimeType === 'image/jpeg') {
-            console.log(`[Server WSS Proxy] Forwarding 1 FPS video frame (${chunk.data?.length || 0} bytes) to Gemini Live API`);
-          }
-        }
-      }
-
       if (parsed.type === 'trigger_chunk_reconnect') {
         chunkCount++;
         const summaryContext = contextHistory.slice(-20).join('\n') || parsed.context || 'Continuing session context...';
