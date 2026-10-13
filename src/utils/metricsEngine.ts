@@ -46,7 +46,7 @@ export class MetricsEngine {
   public addText(text: string, timestampSec: number = Date.now() / 1000): void {
     const words = text
       .toLowerCase()
-      .replace(/[^\w\s\']/g, '')
+      .replace(/[^\w\s']/g, '')
       .split(/\s+/)
       .filter((w) => w.length > 0);
 

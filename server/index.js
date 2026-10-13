@@ -336,7 +336,7 @@ wss.on('connection', (clientWs, req) => {
         if (clientWs.readyState === WebSocket.OPEN) {
           clientWs.send(responseString);
         }
-      } catch (err) {
+      } catch {
         if (clientWs.readyState === WebSocket.OPEN) {
           clientWs.send(data);
         }
@@ -391,7 +391,7 @@ wss.on('connection', (clientWs, req) => {
       if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
         geminiWs.send(msgStr);
       }
-    } catch (e) {
+    } catch {
       if (geminiWs && geminiWs.readyState === WebSocket.OPEN) {
         geminiWs.send(msg);
       }
