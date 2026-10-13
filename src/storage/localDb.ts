@@ -1,19 +1,61 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { PaceTake } from '@/live/metrics/ghost';
+import type { LiveSessionResult, SessionMetrics, TranscriptLine } from '@/live/LiveSessionEngine';
+import type { PauseSpan, WordSegment } from '@/components/sonogram/types';
+import type { SessionConfig } from '@/session/config';
+import type { FieldNotes } from '@/types/fieldNotes';
 
 /**
- * On-device storage for the new app. Nothing here leaves the device.
- * Separate from the legacy 'VireoDB' so the old screens keep working until they are removed.
+ * On-device storage. Nothing here leaves the device; no video is ever stored.
+ * Separate from the legacy 'VireoDB' database, which is only read once to import old stories.
  */
+
+export type NotesStatus = 'pending' | 'ready' | 'failed';
+
+export interface StoredSession {
+  id: string;
+  createdAt: string;
+  config: SessionConfig;
+  segments: WordSegment[];
+  pauses: PauseSpan[];
+  transcript: TranscriptLine[];
+  metrics: SessionMetrics;
+  /** Ghost-pace summary of this take. */
+  take: Pick<PaceTake, 'avgWpm' | 'inZoneRatio' | 'fillersPerMin'>;
+  newBest: boolean;
+  notesStatus: NotesStatus;
+  notes?: FieldNotes;
+  notesError?: string;
+  /** Drill titles ticked off on the field notes page. */
+  drillsDone?: string[];
+}
+
+export type StoryKind = 'story' | 'bit';
+
+export interface StoredStory {
+  id: string;
+  kind: StoryKind;
+  title: string;
+  /** Stories: Interview, Research, Pitch, Talk, Toast. Bits: Opener, Callback, Closer. */
+  tag: string;
+  /** Roughly how long it should take, e.g. "90 seconds". */
+  length: string;
+  gist: string;
+  /** The key points a rehearsal should hit, in order. */
+  keyPoints: string[];
+  createdAt: string;
+  updatedAt: string;
+  lastSessionId?: string;
+}
+
 export interface VireoLocalDB extends DBSchema {
-  ghosts: {
-    key: string;
-    value: PaceTake;
-  };
+  ghosts: { key: string; value: PaceTake };
+  sessions: { key: string; value: StoredSession; indexes: { 'by-createdAt': string } };
+  stories: { key: string; value: StoredStory; indexes: { 'by-kind': StoryKind } };
 }
 
 export const LOCAL_DB_NAME = 'vireo-local';
-export const LOCAL_DB_VERSION = 1;
+export const LOCAL_DB_VERSION = 2;
 
 let dbPromise: Promise<IDBPDatabase<VireoLocalDB>> | null = null;
 
@@ -23,6 +65,12 @@ export function getLocalDb(): Promise<IDBPDatabase<VireoLocalDB>> {
       upgrade(db, oldVersion) {
         if (oldVersion < 1) {
           db.createObjectStore('ghosts', { keyPath: 'key' });
+        }
+        if (oldVersion < 2) {
+          const sessions = db.createObjectStore('sessions', { keyPath: 'id' });
+          sessions.createIndex('by-createdAt', 'createdAt');
+          const stories = db.createObjectStore('stories', { keyPath: 'id' });
+          stories.createIndex('by-kind', 'kind');
         }
       },
     });
@@ -35,10 +83,77 @@ export function resetLocalDbConnection(): void {
   dbPromise = null;
 }
 
+export function newId(prefix: string): string {
+  const rand = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID().slice(0, 8) : Math.random().toString(36).slice(2, 10);
+  return `${prefix}_${Date.now().toString(36)}${rand}`;
+}
+
+// ---------- ghosts ----------
+
 export async function getGhost(key: string): Promise<PaceTake | undefined> {
   return (await getLocalDb()).get('ghosts', key);
 }
 
 export async function putGhost(take: PaceTake): Promise<void> {
   await (await getLocalDb()).put('ghosts', take);
+}
+
+// ---------- sessions ----------
+
+export function sessionFromResult(result: LiveSessionResult, config: SessionConfig, id = newId('sess')): StoredSession {
+  return {
+    id,
+    createdAt: result.startedAt || new Date().toISOString(),
+    config,
+    segments: result.segments,
+    pauses: result.pauses,
+    transcript: result.transcript,
+    metrics: result.metrics,
+    take: { avgWpm: result.take.avgWpm, inZoneRatio: result.take.inZoneRatio, fillersPerMin: result.take.fillersPerMin },
+    newBest: result.newBest,
+    notesStatus: 'pending',
+  };
+}
+
+export async function saveSession(session: StoredSession): Promise<void> {
+  await (await getLocalDb()).put('sessions', session);
+}
+
+export async function getSession(id: string): Promise<StoredSession | undefined> {
+  return (await getLocalDb()).get('sessions', id);
+}
+
+/** Newest first. */
+export async function listSessions(): Promise<StoredSession[]> {
+  const all = await (await getLocalDb()).getAllFromIndex('sessions', 'by-createdAt');
+  return all.reverse();
+}
+
+export async function updateSession(id: string, patch: Partial<StoredSession>): Promise<StoredSession | undefined> {
+  const db = await getLocalDb();
+  const current = await db.get('sessions', id);
+  if (!current) return undefined;
+  const next = { ...current, ...patch, id };
+  await db.put('sessions', next);
+  return next;
+}
+
+// ---------- stories and bits ----------
+
+export async function listStories(kind?: StoryKind): Promise<StoredStory[]> {
+  const db = await getLocalDb();
+  const all = kind ? await db.getAllFromIndex('stories', 'by-kind', kind) : await db.getAll('stories');
+  return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export async function getStory(id: string): Promise<StoredStory | undefined> {
+  return (await getLocalDb()).get('stories', id);
+}
+
+export async function saveStory(story: StoredStory): Promise<void> {
+  await (await getLocalDb()).put('stories', story);
+}
+
+export async function deleteStory(id: string): Promise<void> {
+  await (await getLocalDb()).delete('stories', id);
 }
