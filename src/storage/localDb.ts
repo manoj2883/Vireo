@@ -1,4 +1,5 @@
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { deleteDB, openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { LEGACY_DB_NAME } from './legacyDb';
 import type { PaceTake } from '@/live/metrics/ghost';
 import type { LiveSessionResult, SessionMetrics, TranscriptLine } from '@/live/LiveSessionEngine';
 import type { PauseSpan, WordSegment } from '@/components/sonogram/types';
@@ -7,7 +8,7 @@ import type { FieldNotes } from '@/types/fieldNotes';
 
 /**
  * On-device storage. Nothing here leaves the device; no video is ever stored.
- * Separate from the legacy 'VireoDB' database, which is only read once to import old stories.
+ * The previous version's database is only read once to import old stories (see legacyDb).
  */
 
 export type NotesStatus = 'pending' | 'ready' | 'failed';
@@ -156,4 +157,54 @@ export async function saveStory(story: StoredStory): Promise<void> {
 
 export async function deleteStory(id: string): Promise<void> {
   await (await getLocalDb()).delete('stories', id);
+}
+
+// ---------- deleting ----------
+
+/**
+ * Delete one session and everything derived from it: the session record (transcript,
+ * metrics, notes), the ghost pace take it set, and the link from its Story Bank story.
+ */
+export async function deleteSession(id: string): Promise<void> {
+  const db = await getLocalDb();
+  const tx = db.transaction(['sessions', 'ghosts', 'stories'], 'readwrite');
+  await tx.objectStore('sessions').delete(id);
+  for (const ghost of await tx.objectStore('ghosts').getAll()) {
+    if (ghost.takeId === id) await tx.objectStore('ghosts').delete(ghost.key);
+  }
+  for (const story of await tx.objectStore('stories').getAll()) {
+    if (story.lastSessionId === id) await tx.objectStore('stories').put({ ...story, lastSessionId: undefined });
+  }
+  await tx.done;
+}
+
+/** Browser storage keys Vireo writes, besides the theme preference. */
+const SESSION_KEYS = ['vireo-session-config'];
+const LOCAL_KEYS = ['vireo-legacy-imported'];
+
+/**
+ * Delete everything Vireo keeps on this device: sessions, notes, the Story Bank, ghost pace,
+ * the previous version's database and the remembered warm-up. The theme preference stays.
+ */
+export async function deleteAllData(): Promise<void> {
+  if (dbPromise) {
+    (await dbPromise.catch(() => null))?.close();
+    dbPromise = null;
+  }
+  await deleteDB(LOCAL_DB_NAME);
+  await deleteDB(LEGACY_DB_NAME);
+  for (const k of SESSION_KEYS) {
+    try {
+      sessionStorage.removeItem(k);
+    } catch {
+      // ignore
+    }
+  }
+  for (const k of LOCAL_KEYS) {
+    try {
+      localStorage.removeItem(k);
+    } catch {
+      // ignore
+    }
+  }
 }

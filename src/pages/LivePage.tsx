@@ -11,7 +11,7 @@ import { PauseRing } from '@/components/hud/PauseRing';
 import { FillerTicker } from '@/components/hud/FillerTicker';
 import { LiveSessionEngine } from '@/live/LiveSessionEngine';
 import { useLiveSnapshot } from '@/live/useLiveSession';
-import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory } from '@/storage/localDb';
+import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory, newId } from '@/storage/localDb';
 import { loadConfig, saveConfig, type SessionConfig } from '@/session/config';
 
 const CAPTION_WORDS = 12;
@@ -89,8 +89,9 @@ function LiveView({
 
   async function endSession() {
     setEnding(true);
-    const result = await engine.end();
-    const stored = sessionFromResult(result, { ...config, hideFace });
+    const id = newId('sess');
+    const result = await engine.end(id);
+    const stored = sessionFromResult(result, { ...config, hideFace }, id);
     await saveSession(stored);
     if (config.storyId) {
       const story = await getStory(config.storyId);

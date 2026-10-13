@@ -1,4 +1,4 @@
-import { getAllBits, getAllStories } from '@/services/db';
+import { readLegacyLibrary } from './legacyDb';
 import { listStories, newId, saveStory, type StoredStory } from './localDb';
 
 const FLAG = 'vireo-legacy-imported';
@@ -16,10 +16,10 @@ export async function importLegacyStoriesOnce(): Promise<number> {
   let imported = 0;
   try {
     if ((await listStories()).length === 0) {
-      const [stories, bits] = await Promise.all([getAllStories().catch(() => []), getAllBits().catch(() => [])]);
+      const { stories, bits } = await readLegacyLibrary().catch(() => ({ stories: [], bits: [] }));
       const now = new Date().toISOString();
       for (const s of stories) {
-        const b = s.beats ?? ({} as Record<string, string>);
+        const b = s.beats ?? {};
         const keyPoints = [b.hook, b.stakes, b.obstacle, b.turn, b.payoff, b.landingLine].filter((p): p is string => Boolean(p && p.trim()));
         const story: StoredStory = {
           id: newId('story'),

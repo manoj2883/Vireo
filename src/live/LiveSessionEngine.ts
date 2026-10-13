@@ -277,8 +277,11 @@ export class LiveSessionEngine {
     for (const l of this.listeners) l();
   }
 
-  /** Stop everything and return what the field notes need. Saves the take as the ghost if it's the best yet. */
-  async end(): Promise<LiveSessionResult> {
+  /**
+   * Stop everything and return what the field notes need. Saves the take as the ghost if it's
+   * the best yet, under `takeId` (the stored session's id, so deleting the session removes it).
+   */
+  async end(takeId = `take_${Date.now()}`): Promise<LiveSessionResult> {
     const nowMs = this.elapsed();
     this.tick(nowMs);
     this.ended = true;
@@ -291,7 +294,7 @@ export class LiveSessionEngine {
     const segments = this.snapshot.segments;
     const pauses = this.vad.getPauses().slice();
     const key = ghostKey(this.config.storyId ?? this.config.prompt);
-    const take = summariseTake(key, `take_${Date.now()}`, this.trace, this.zone, countFillers(segments, this.fillers), nowMs);
+    const take = summariseTake(key, takeId, this.trace, this.zone, countFillers(segments, this.fillers), nowMs);
     const newBest = isBetterTake(take, this.ghost);
     if (newBest) await this.deps.ghostStore?.put(take).catch(() => {});
 
