@@ -30,7 +30,7 @@ COPY package*.json ./
 COPY server/package*.json ./server/
 
 # Install only production dependencies in server
-RUN cd server && npm ci --only=production
+RUN cd server && npm ci --omit=dev
 
 # Copy built frontend bundle from builder stage
 COPY --from=builder /app/dist ./dist
