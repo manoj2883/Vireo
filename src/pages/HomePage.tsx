@@ -6,7 +6,8 @@ import { oneDecimal, relativeDay, signed } from '@/lib/format';
 import { homeNumbers, kicker, progressHeadline } from '@/lib/progress';
 import { Button } from '@/components/ui/button';
 import { Sonogram } from '@/components/sonogram';
-import { listSessions, listStories, type StoredSession, type StoredStory } from '@/storage/localDb';
+import { deleteAllData, listSessions, listStories, type StoredSession, type StoredStory } from '@/storage/localDb';
+import { ConfirmDelete } from '@/components/ConfirmDelete';
 import { saveConfig, type SessionConfig } from '@/session/config';
 
 /** Home (`/app`): progress from real sessions, today's drill, the last ten sessions drawn. */
@@ -180,6 +181,28 @@ export function HomePage() {
             ))}
           </ul>
         )}
+      </section>
+
+      <section aria-labelledby="data-h" className="flex flex-col gap-4 border-t border-line pt-10">
+        <h2 id="data-h" className="m-0 text-heading">
+          Your data stays here
+        </h2>
+        <p className="m-0 max-w-[720px] text-body text-ink-muted">
+          Sessions, transcripts, field notes and your Story Bank are stored in this browser only. Video is analysed live and never stored. During a session, your audio and
+          one camera frame a second go to Google’s Gemini Live to be transcribed; afterwards, your transcript goes to the model your server is set up to use for field notes.
+        </p>
+        <div>
+          <ConfirmDelete
+            label="Delete all data"
+            warning="This deletes every session, note and story on this device."
+            confirmLabel="Delete everything"
+            onConfirm={async () => {
+              await deleteAllData();
+              setSessions([]);
+              setStories([]);
+            }}
+          />
+        </div>
       </section>
     </div>
   );

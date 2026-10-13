@@ -9,7 +9,8 @@ import { Sonogram, type WordSegment } from '@/components/sonogram';
 import { TALK_TYPES } from '@/live/metrics/pace';
 import { requestFieldNotes } from '@/session/fieldNotesApi';
 import { saveConfig, type SessionConfig } from '@/session/config';
-import { getSession, getStory, listSessions, newId, saveStory, updateSession, type StoredSession } from '@/storage/localDb';
+import { deleteSession, getSession, getStory, listSessions, newId, saveStory, updateSession, type StoredSession } from '@/storage/localDb';
+import { ConfirmDelete } from '@/components/ConfirmDelete';
 import type { FieldNote, FieldNotes } from '@/types/fieldNotes';
 
 const MIN_WORDS = 20;
@@ -255,6 +256,21 @@ function FieldNotesView({
       )}
 
       {notes && notes.drills.length > 0 && <Drills session={session} notes={notes} onChange={onChange} />}
+
+      <section aria-label="This session’s data" className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-8">
+        <p className="m-0 max-w-[640px] text-small text-ink-muted">
+          This session’s transcript, drawing and notes are stored only on this device. No video was recorded.
+        </p>
+        <ConfirmDelete
+          label="Delete session"
+          warning="This deletes the transcript, drawing and notes from this device."
+          confirmLabel="Delete session"
+          onConfirm={async () => {
+            await deleteSession(session.id);
+            navigate('/app', { replace: true });
+          }}
+        />
+      </section>
     </div>
   );
 }

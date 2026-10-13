@@ -214,6 +214,39 @@ describe('Field notes', () => {
   });
 });
 
+describe('Deleting', () => {
+  it('deletes a session from its field notes after confirming', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
+    renderAt('/notes/sess_1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete session' }));
+    expect(screen.getByText(/this deletes the transcript, drawing and notes from this device/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keep it' })).toHaveFocus();
+    fireEvent.click(screen.getByRole('button', { name: 'Delete session' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your first session starts here.' })).toBeInTheDocument();
+    expect(await getSession('sess_1')).toBeUndefined();
+  });
+
+  it('keeps the session when the delete is cancelled', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
+    renderAt('/notes/sess_1');
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete session' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Keep it' }));
+    expect(screen.getByRole('button', { name: 'Delete session' })).toBeInTheDocument();
+    expect(await getSession('sess_1')).toBeDefined();
+  });
+
+  it('deletes all data from Home', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
+    renderAt('/app');
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete all data' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete everything' }));
+    });
+    expect(await screen.findByRole('heading', { level: 1, name: 'Your first session starts here.' })).toBeInTheDocument();
+    expect(await getSession('sess_1')).toBeUndefined();
+  });
+});
+
 describe('Home', () => {
   it('builds the headline and numbers from real sessions', async () => {
     const day = 86_400_000;
