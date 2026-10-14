@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/theme/ThemeProvider';
 import { AppRoutes } from '@/routes';
 import { getSession, listStories, resetLocalDbConnection, saveSession, saveStory, type StoredSession } from '@/storage/localDb';
 import { saveConfig } from '@/session/config';
+import { fieldNotesRetry } from '@/session/fieldNotesApi';
 import { PaceBand } from '@/components/hud/PaceBand';
 import type { FieldNotes } from '@/types/fieldNotes';
 
@@ -59,6 +60,7 @@ function mockFetch(response: { ok: boolean; body: unknown }) {
 }
 
 beforeEach(() => {
+  fieldNotesRetry.delayMs = 30;
   globalThis.indexedDB = new IDBFactory();
   resetLocalDbConnection();
   // The warm-up preview and the live session ask for media; jsdom has none.
@@ -176,11 +178,27 @@ describe('Field notes', () => {
     expect(screen.getByRole('button', { name: /answer it now/i })).toBeInTheDocument();
   });
 
-  it('keeps the drawing and offers a retry when notes fail', async () => {
+  it('tries again automatically once when the first request fails', async () => {
     await saveSession(storedSession());
-    mockFetch({ ok: false, body: { error: 'gemini request failed: 429 rate limited' } });
+    const fetchSpy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ ok: false, status: 502, json: async () => ({ error: 'gemini request failed: 503 high demand' }) } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => NOTES } as Response);
+    fieldNotesRetry.delayMs = 300;
+    renderAt('/notes/sess_1');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Busy, trying again' })).toBeInTheDocument();
+    expect(screen.getByText(/your drawing and transcript are already saved/i)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' }, { timeout: 3000 })).toBeInTheDocument();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the drawing and offers a retry when notes fail twice', async () => {
+    await saveSession(storedSession());
+    const fetchSpy = mockFetch({ ok: false, body: { error: 'gemini request failed: 429 rate limited' } });
     renderAt('/notes/sess_1');
     expect(await screen.findByRole('alert')).toHaveTextContent('gemini request failed: 429 rate limited');
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/your drawing and transcript are saved on this device/i)).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /the whole answer as a sonogram/i })).toBeInTheDocument();
 
     mockFetch({ ok: true, body: NOTES });

@@ -19,7 +19,8 @@ export function createAnthropicProvider({
   client,
 } = {}) {
   if (!apiKey && !client) throw new Error('ANTHROPIC_API_KEY is not set (needed for LLM_PROVIDER=anthropic).');
-  const anthropic = client ?? new Anthropic({ apiKey });
+  // Retries are handled once, in llm/retry.js, so the SDK's own retries are off.
+  const anthropic = client ?? new Anthropic({ apiKey, maxRetries: 0 });
   // Claude Opus 5.5 defaults to medium effort; field notes are judgement work, so ask for high.
   const resolvedEffort = effort ?? (model === DEFAULT_ANTHROPIC_MODEL ? 'high' : undefined);
 
