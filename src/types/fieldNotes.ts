@@ -4,6 +4,8 @@ export interface FieldNote {
   title: string;
   body: string;
   quote: string;
+  /** For a camera note: the camera event it is about. */
+  cameraEventId?: string | null;
   startMs: number;
 }
 
