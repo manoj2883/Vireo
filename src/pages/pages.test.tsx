@@ -57,6 +57,9 @@ const NOTES: FieldNotes = {
   drills: [{ title: 'The full stop', instructions: 'Say the result, breathe, explain.', minutes: 4 }],
 };
 
+/** Only the field-notes requests (the page also asks for the tightened answer). */
+const notesCalls = (spy: { mock: { calls: unknown[][] } }) => spy.mock.calls.filter((c) => String(c[0]) === '/api/field-notes');
+
 function mockFetch(response: { ok: boolean; body: unknown }) {
   return vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: response.ok, status: response.ok ? 200 : 502, json: async () => response.body } as Response);
 }
@@ -173,7 +176,7 @@ describe('Field notes', () => {
     renderAt('/notes/sess_1');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' })).toBeInTheDocument();
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(notesCalls(fetchSpy)).toHaveLength(1);
     const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
     expect(body.context).toMatchObject({ prompt: 'Tell me about your research.', paceZone: { min: 130, max: 160 } });
     expect(body.transcript).toHaveLength(2);
@@ -218,7 +221,7 @@ describe('Field notes', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Busy, trying again' })).toBeInTheDocument();
     expect(screen.getByText(/your drawing and transcript are already saved/i)).toBeInTheDocument();
     expect(await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' }, { timeout: 3000 })).toBeInTheDocument();
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(notesCalls(fetchSpy)).toHaveLength(2);
   });
 
   it('keeps the drawing and offers a retry when notes fail twice', async () => {
@@ -438,5 +441,53 @@ describe('camera feedback', () => {
     renderAt('/notes/sess_1');
     await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' });
     expect(screen.queryByTestId('eye-contact-strip')).not.toBeInTheDocument();
+  });
+});
+
+describe('One fix and your answer, tightened', () => {
+  const ONE_FIX = { ...NOTES, oneFix: { instruction: 'Give your result a full pause before you say it.', why: 'It lands harder.' }, mainPointMs: 2000 };
+  const TIGHT = { script: 'The answers it refused were the right ones. / My research is about teaching AI systems to say no.', mainPoint: 'The answers it refused were the right ones.' };
+
+  function routeFetch() {
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const body = String(url) === '/api/tighten' ? TIGHT : ONE_FIX;
+      return { ok: true, status: 200, json: async () => body } as Response;
+    });
+  }
+
+  it('opens with the one fix as the heading, then asks for the tightened answer', async () => {
+    await saveSession(storedSession());
+    const spy = routeFetch();
+    renderAt('/notes/sess_1');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Give your result a full pause before you say it.' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Clear story. Rushed ending.' })).toBeInTheDocument();
+    expect(await screen.findByText(/^The answers it refused were the right ones\.\s*$/)).toBeInTheDocument();
+    const tightenCall = spy.mock.calls.find((c) => String(c[0]) === '/api/tighten')!;
+    expect(JSON.parse((tightenCall[1] as RequestInit).body as string).context.oneFix).toBe('Give your result a full pause before you say it.');
+    expect((await getSession('sess_1'))?.tightened?.status).toBe('ready');
+  });
+
+  it('shows what changed: removed words struck through, pauses kept', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: ONE_FIX, tightened: { ...TIGHT, status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    fireEvent.click(await screen.findByRole('switch', { name: 'Show changes' }));
+    const changes = screen.getByTestId('tightened-changes');
+    expect(within(changes).getAllByText(/^um$/i)[0].closest('del')).not.toBeNull();
+    expect(within(changes).getByLabelText('pause')).toBeInTheDocument();
+  });
+
+  it('reruns the same question with the fix carried along', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: ONE_FIX, tightened: { ...TIGHT, status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    fireEvent.click(await screen.findByRole('button', { name: /try again with this fix/i }));
+    const saved = JSON.parse(sessionStorage.getItem('vireo-session-config')!);
+    expect(saved).toMatchObject({ prompt: 'Tell me about your research.', retake: { fromSessionId: 'sess_1', oneFix: 'Give your result a full pause before you say it.', script: TIGHT.script } });
+  });
+
+  it('explains a failed tightening and offers to try again', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: ONE_FIX, tightened: { script: '', mainPoint: '', status: 'failed', error: 'gemini returned unusable tightened answers twice' } }));
+    renderAt('/notes/sess_1');
+    const alert = await screen.findByText(/unusable tightened answers/);
+    expect(alert.parentElement).toHaveTextContent('Try again');
   });
 });

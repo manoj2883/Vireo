@@ -20,6 +20,7 @@ export async function requestFieldNotes(session: StoredSession, story?: StoredSt
         durationMs: session.metrics.durationMs,
         paceZone: talk.zone,
         situation: situation ? { label: situation.label, criteria: situation.criteria, timeLimitMs: situation.timeLimitMs } : undefined,
+        previousFix: session.config.retake?.oneFix,
         story: story ? { title: story.title, keyPoints: story.keyPoints } : undefined,
         metrics: session.metrics,
         camera: session.camera ? { summary: session.camera.summary, events: session.camera.events } : undefined,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, Mic, Play } from 'lucide-react';
+import { ChevronLeft, Mic, Play, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clock, durationWords, longDate, signed } from '@/lib/format';
 import { bestScores } from '@/lib/progress';
@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Sonogram, type WordSegment } from '@/components/sonogram';
 import { TALK_TYPES } from '@/live/metrics/pace';
 import { requestFieldNotesWithRetry } from '@/session/fieldNotesApi';
+import { requestTightened } from '@/session/tightenApi';
+import { TightenedAnswer } from '@/components/notes/TightenedAnswer';
 import { saveConfig, type SessionConfig } from '@/session/config';
 import { deleteSession, getSession, getStory, listSessions, newId, saveStory, updateSession, type StoredSession } from '@/storage/localDb';
 import { ConfirmDelete } from '@/components/ConfirmDelete';
@@ -16,6 +18,7 @@ import type { FieldNote, FieldNotes } from '@/types/fieldNotes';
 const MIN_WORDS = 20;
 /** Requests in flight, so a remount doesn't ask twice. */
 const inFlight = new Set<string>();
+const tightenInFlight = new Set<string>();
 
 type Load = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; session: StoredSession; best: ReturnType<typeof bestScores> };
 
@@ -25,12 +28,33 @@ export function FieldNotesPage() {
   const [load, setLoad] = useState<Load>({ status: 'loading' });
   /** Set while waiting for the automatic second try. */
   const [retrying, setRetrying] = useState(false);
+  const [tightenPending, setTightenPending] = useState(false);
 
   const refresh = useCallback(async () => {
     const [session, all] = await Promise.all([getSession(id), listSessions()]);
     setLoad(session ? { status: 'ready', session, best: bestScores(all, id) } : { status: 'missing' });
     return session;
   }, [id]);
+
+  /** "Your answer, tightened", once the notes (and their one fix) exist. */
+  const tighten = useCallback(
+    async (session: StoredSession) => {
+      if (tightenInFlight.has(session.id)) return;
+      tightenInFlight.add(session.id);
+      setTightenPending(true);
+      try {
+        const t = await requestTightened(session);
+        await updateSession(session.id, { tightened: { ...t, status: 'ready' } });
+      } catch (err) {
+        await updateSession(session.id, { tightened: { script: '', mainPoint: '', status: 'failed', error: err instanceof Error ? err.message : String(err) } });
+      } finally {
+        tightenInFlight.delete(session.id);
+        setTightenPending(false);
+        await refresh();
+      }
+    },
+    [refresh]
+  );
 
   const write = useCallback(
     async (session: StoredSession) => {
@@ -50,7 +74,8 @@ export function FieldNotesPage() {
         await refresh();
         const story = session.config.storyId ? await getStory(session.config.storyId) : undefined;
         const notes = await requestFieldNotesWithRetry(session, story, () => setRetrying(true));
-        await updateSession(session.id, { notesStatus: 'ready', notes });
+        const updated = await updateSession(session.id, { notesStatus: 'ready', notes });
+        if (updated && updated.segments.length >= MIN_WORDS) void tighten(updated);
       } catch (err) {
         await updateSession(session.id, { notesStatus: 'failed', notesError: err instanceof Error ? err.message : String(err) });
       } finally {
@@ -59,14 +84,15 @@ export function FieldNotesPage() {
         await refresh();
       }
     },
-    [refresh]
+    [refresh, tighten]
   );
 
   useEffect(() => {
     refresh().then((s) => {
       if (s && s.notesStatus === 'pending') void write(s);
+      else if (s && s.notesStatus === 'ready' && !s.tightened && s.segments.length >= MIN_WORDS) void tighten(s);
     });
-  }, [refresh, write]);
+  }, [refresh, write, tighten]);
 
   if (load.status === 'loading') return <p className="text-ink-muted">Opening your field notes</p>;
   if (load.status === 'missing') {
@@ -82,19 +108,35 @@ export function FieldNotesPage() {
       </div>
     );
   }
-  return <FieldNotesView session={load.session} best={load.best} retrying={retrying} onRetry={() => write(load.session)} onChange={refresh} />;
+  return (
+    <FieldNotesView
+      session={load.session}
+      best={load.best}
+      retrying={retrying}
+      onRetry={() => write(load.session)}
+      tightenPending={tightenPending}
+      onRetryTighten={() => {
+        void updateSession(load.session.id, { tightened: undefined }).then((s) => s && tighten(s));
+      }}
+      onChange={refresh}
+    />
+  );
 }
 
 function FieldNotesView({
   session,
   best,
   retrying,
+  tightenPending,
+  onRetryTighten,
   onRetry,
   onChange,
 }: {
   session: StoredSession;
   best: ReturnType<typeof bestScores>;
   retrying: boolean;
+  tightenPending: boolean;
+  onRetryTighten: () => void;
   onRetry: () => void;
   onChange: () => Promise<unknown>;
 }) {
@@ -112,6 +154,18 @@ function FieldNotesView({
   function practise(config: SessionConfig) {
     saveConfig(config);
     navigate('/warm-up', { state: { preset: config } });
+  }
+
+  /** Rerun the same question and situation, with the one fix (and tightened script) carried along. */
+  function tryAgain() {
+    if (!notes?.oneFix) return;
+    const config: SessionConfig = {
+      ...session.config,
+      parentSessionId: undefined,
+      retake: { fromSessionId: session.retakeOf ?? session.id, oneFix: notes.oneFix.instruction, script: session.tightened?.script },
+    };
+    saveConfig(config);
+    navigate('/session');
   }
 
   function answerFollowUp() {
@@ -192,15 +246,39 @@ function FieldNotesView({
           Field notes for your {talk.label.toLowerCase()}, recorded {longDate(session.createdAt)}, {durationWords(session.metrics.durationMs)}
         </p>
         {notes ? (
-          <>
-            <h1 className="m-0 max-w-[980px] font-display text-[clamp(52px,8vw,112px)] font-normal leading-[0.95] tracking-[-0.035em]">{notes.verdict}</h1>
-            <p className="m-0 max-w-[760px] text-[19px] leading-[30px] text-ink-muted">{notes.summary}</p>
-            <Scores notes={notes} best={best} session={session} />
-          </>
+          notes.oneFix ? (
+            <>
+              <div className="paper-scope flex flex-col gap-4 rounded-lg bg-paper p-7 text-paper-foreground sm:p-10">
+                <p className="m-0 text-label opacity-75">Your one fix for the next take</p>
+                <h1 className="m-0 max-w-[900px] font-display text-[clamp(36px,5vw,64px)] font-normal leading-[1.02] tracking-[-0.03em]">{notes.oneFix.instruction}</h1>
+                <p className="m-0 max-w-[720px] text-body opacity-85">{notes.oneFix.why}</p>
+                <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <Button size="lg" onClick={tryAgain} className="bg-paper-foreground text-paper hover:bg-paper-foreground/90">
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    Try again with this fix
+                  </Button>
+                  <span className="text-small opacity-75">Same question{session.config.situationId ? ' and situation' : ''}. The fix stays on screen while you speak.</span>
+                </div>
+              </div>
+              <h2 className="m-0 mt-6 max-w-[980px] font-display text-[clamp(40px,5.6vw,80px)] font-normal leading-[0.98] tracking-[-0.03em]">{notes.verdict}</h2>
+              <p className="m-0 max-w-[760px] text-[19px] leading-[30px] text-ink-muted">{notes.summary}</p>
+              <Scores notes={notes} best={best} session={session} />
+            </>
+          ) : (
+            <>
+              <h1 className="m-0 max-w-[980px] font-display text-[clamp(52px,8vw,112px)] font-normal leading-[0.95] tracking-[-0.035em]">{notes.verdict}</h1>
+              <p className="m-0 max-w-[760px] text-[19px] leading-[30px] text-ink-muted">{notes.summary}</p>
+              <Scores notes={notes} best={best} session={session} />
+            </>
+          )
         ) : (
           <NotesPending session={session} retrying={retrying} onRetry={onRetry} />
         )}
       </section>
+
+      {notes && session.segments.length >= MIN_WORDS && (
+        <TightenedAnswer original={session.transcript.map((l) => l.text).join(' ')} tightened={session.tightened} pending={tightenPending} onRetry={onRetryTighten} />
+      )}
 
       <section aria-labelledby="whole-h" className="flex flex-col gap-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
