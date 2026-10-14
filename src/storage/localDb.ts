@@ -34,6 +34,10 @@ export interface StoredSession {
   likelyFillers?: { startMs: number; endMs: number }[];
   /** On-device camera events and summary (no video is ever stored). */
   camera?: CameraResult | null;
+  /** Retakes of the same question form a series; this is the first take's id. */
+  retakeOf?: string;
+  /** "Your answer, tightened": the rewrite of what was said, checked against the transcript. */
+  tightened?: { script: string; mainPoint: string; status: 'ready' | 'failed'; error?: string };
 }
 
 export type StoryKind = 'story' | 'bit';
@@ -119,6 +123,7 @@ export function sessionFromResult(result: LiveSessionResult, config: SessionConf
     newBest: result.newBest,
     likelyFillers: result.likelyFillers,
     camera: result.camera,
+    retakeOf: config.retake?.fromSessionId,
     notesStatus: 'pending',
   };
 }

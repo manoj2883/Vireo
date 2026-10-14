@@ -37,6 +37,21 @@ export const DrillSchema = z.object({
 
 export const FieldNotesSchema = z.object({
   verdict: z.string().min(1),
+  /** The single most important change, as an instruction for the next take. */
+  oneFix: z.object({
+    instruction: z.string().min(1),
+    why: z.string().min(1),
+  }),
+  /** When the main point was first stated, in ms; null if it never was. */
+  mainPointMs: ms.nullable(),
+  /** On a retake: whether the previous take's one fix was achieved, with an exact quote as evidence. */
+  previousFix: z
+    .object({
+      achieved: z.boolean(),
+      evidence: z.string(),
+      startMs: ms.nullable(),
+    })
+    .nullable(),
   summary: z.string().min(1),
   scores: z.object({
     structure: score,
@@ -54,4 +69,3 @@ export const FieldNotesSchema = z.object({
   drills: z.array(DrillSchema).min(1),
 });
 
-export const fieldNotesJsonSchema = () => z.toJSONSchema(FieldNotesSchema);

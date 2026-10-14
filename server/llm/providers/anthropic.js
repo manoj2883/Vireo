@@ -27,14 +27,15 @@ export function createAnthropicProvider({
   return {
     name: 'anthropic',
     model,
-    async complete({ system, messages }) {
+    /** @param {{ system: string, messages: object[], schema?: import('zod/v4').ZodType }} req */
+    async complete({ system, messages, schema }) {
       const request = {
         model,
         max_tokens: 16000,
         system,
         messages,
         output_config: {
-          format: betaZodOutputFormat(FieldNotesSchema),
+          format: betaZodOutputFormat(schema ?? FieldNotesSchema),
           ...(resolvedEffort ? { effort: resolvedEffort } : {}),
         },
         ...(fallbacks ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' } : {}),

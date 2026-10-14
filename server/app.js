@@ -2,8 +2,8 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { generateTeardown, describeProvider, TeardownError } from './llm/index.js';
-import { verifyNotes } from './llm/evidence.js';
+import { generateTeardown, generateTightened, describeProvider, TeardownError } from './llm/index.js';
+import { verifyNotes, verifyPreviousFix } from './llm/evidence.js';
 import { grantSttToken, SttTokenError } from './stt.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -12,7 +12,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * The HTTP API: transcription tokens, field notes and health, plus the built front end.
  * `generate` is injectable so the field notes route can be tested without a model.
  */
-export function createApp({ env = process.env, generate = generateTeardown, grantToken = grantSttToken, fetchImpl = fetch, log = console } = {}) {
+export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, grantToken = grantSttToken, fetchImpl = fetch, log = console } = {}) {
   // Per-connection session limit (in memory; replaced by a shared store for serverless).
   const ipRequestLogs = new Map();
   const MAX_SESSIONS_PER_IP_PER_HOUR = 20;
@@ -80,11 +80,34 @@ export function createApp({ env = process.env, generate = generateTeardown, gran
         model: result.model,
         ...result.notes,
         notes,
+        previousFix: verifyPreviousFix(result.notes.previousFix, lines),
         droppedNotes: dropped.length,
       });
     } catch (err) {
       const status = err instanceof TeardownError ? err.status : 500;
       log.error('[Server /api/field-notes Error]:', err.message);
+      res.status(status).json({ error: err.message, provider: err.provider });
+    }
+  });
+
+  // "Your answer, tightened": a read-aloud rewrite that only uses the speaker's own words.
+  app.post('/api/tighten', async (req, res) => {
+    const { transcript, context } = req.body ?? {};
+    if (!Array.isArray(transcript)) {
+      return res.status(400).json({ error: 'transcript must be an array of { speaker, text, startMs } lines.' });
+    }
+    const lines = transcript
+      .filter((t) => t && typeof t.text === 'string')
+      .map((t) => ({ speaker: t.speaker === 'coach' ? 'coach' : 'user', text: t.text, startMs: Number(t.startMs) || 0 }));
+    const words = lines.filter((t) => t.speaker === 'user').reduce((n, t) => n + t.text.trim().split(/\s+/).filter(Boolean).length, 0);
+    if (words < 20) return res.status(400).json({ error: `Say at least 20 words to get a tightened version (heard ${words}).` });
+    try {
+      const prompt = typeof context?.prompt === 'string' ? context.prompt.slice(0, 500) : undefined;
+      const oneFix = typeof context?.oneFix === 'string' ? context.oneFix.slice(0, 500) : undefined;
+      res.json(await tighten(lines, { prompt, oneFix }));
+    } catch (err) {
+      const status = err instanceof TeardownError ? err.status : 500;
+      log.error('[Server /api/tighten Error]:', err.message);
       res.status(status).json({ error: err.message, provider: err.provider });
     }
   });

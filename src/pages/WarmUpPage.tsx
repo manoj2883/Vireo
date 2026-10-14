@@ -1,24 +1,53 @@
 import { useEffect, useId, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, Play } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { TALK_TYPES, type TalkType } from '@/live/metrics/pace';
 import { DEFAULT_CONFIG, loadConfig, saveConfig, type SessionConfig, type WarmUpPreset } from '@/session/config';
+import { SITUATIONS, situationById, type SituationId } from '@/session/situations';
 import { listStories, type StoredStory } from '@/storage/localDb';
 import { usePreviewMedia } from '@/components/hud/usePreviewMedia';
 
-/** Warm-up (`/warm-up`): what you're saying, how Vireo should coach, and a camera check. */
+type Source = SituationId | 'own' | 'story';
+const ALL_QUESTIONS = SITUATIONS.flatMap((x) => x.questions);
+
+/** Settings carried in a reminder link: prompt, situation and drill only, never a transcript. */
+function presetFromUrl(params: URLSearchParams): WarmUpPreset {
+  const out: WarmUpPreset = {};
+  const sit = situationById(params.get('situation'));
+  if (sit) Object.assign(out, { situationId: sit.id, talkType: sit.talkType, audience: sit.audience });
+  const prompt = params.get('prompt');
+  if (prompt) out.prompt = prompt.slice(0, 300);
+  const drill = params.get('drill');
+  if (drill) out.drill = drill.slice(0, 300);
+  return out;
+}
+
+/** Warm-up (`/warm-up`): the situation and question, how Vireo should coach, and a camera check. */
 export function WarmUpPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [params] = useSearchParams();
   const preset = (location.state as { preset?: WarmUpPreset } | null)?.preset;
-  const [config, setConfig] = useState<SessionConfig>(() => ({ ...DEFAULT_CONFIG, ...(loadConfig() ?? {}), ...(preset ?? {}) }));
+  const [config, setConfig] = useState<SessionConfig>(() => {
+    const base: SessionConfig = { ...DEFAULT_CONFIG, ...(loadConfig() ?? {}) };
+    // A warm-up opened directly is a fresh take; a retake arrives as a preset.
+    delete base.retake;
+    const fromUrl = presetFromUrl(params);
+    // A preset or link describes the whole setup: its situation (or none) replaces the remembered one.
+    if (preset || fromUrl.prompt) {
+      delete base.situationId;
+      delete base.drill;
+    }
+    return { ...base, ...fromUrl, ...(preset ?? {}) };
+  });
   const [stories, setStories] = useState<StoredStory[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { state: preview, levels } = usePreviewMedia(videoRef);
   const [calibrating, setCalibrating] = useState<'idle' | 'running' | 'done' | 'failed'>(() => (loadConfig()?.calibration ? 'done' : 'idle'));
+  const ids = { source: useId(), question: useId(), prompt: useId(), mode: useId(), audience: useId(), story: useId(), face: useId(), privacy: useId() };
 
   /** Two seconds of looking at the camera: where "eye contact" is for you, and your usual posture. */
   async function calibrateCamera() {
@@ -35,7 +64,6 @@ export function WarmUpPage() {
       setCalibrating('failed');
     }
   }
-  const ids = { prompt: useId(), mode: useId(), audience: useId(), story: useId(), face: useId(), privacy: useId() };
 
   useEffect(() => {
     listStories('story').then(setStories).catch(() => setStories([]));
@@ -50,14 +78,39 @@ export function WarmUpPage() {
 
   const set = <K extends keyof SessionConfig>(key: K, value: SessionConfig[K]) => setConfig((c) => ({ ...c, [key]: value }));
   const talk = TALK_TYPES[config.talkType];
+  const situation = situationById(config.situationId);
+  const source: Source = situation ? situation.id : config.storyId ? 'story' : 'own';
   const story = stories.find((s) => s.id === config.storyId);
   const canStart = config.prompt.trim().length > 0;
+
+  function pickSource(next: Source) {
+    setConfig((c) => {
+      const sit = situationById(next);
+      if (sit) {
+        // Use the situation's first question unless the speaker wrote their own.
+        const own = c.prompt.trim() && !ALL_QUESTIONS.includes(c.prompt.trim());
+        return { ...c, situationId: sit.id, talkType: sit.talkType, audience: sit.audience, storyId: undefined, prompt: own ? c.prompt : sit.questions[0] };
+      }
+      const prompt = ALL_QUESTIONS.includes(c.prompt.trim()) ? '' : c.prompt;
+      if (next === 'story') {
+        const first = stories[0];
+        return { ...c, situationId: undefined, storyId: c.storyId ?? first?.id, prompt: c.storyId ? prompt : first?.title ?? prompt };
+      }
+      return { ...c, situationId: undefined, storyId: undefined, prompt };
+    });
+  }
 
   function start() {
     if (!canStart) return;
     saveConfig({ ...config, prompt: config.prompt.trim() });
     navigate('/session');
   }
+
+  const sources: { id: Source; title: string; body: string }[] = [
+    ...SITUATIONS.map((x) => ({ id: x.id, title: x.label, body: x.blurb })),
+    { id: 'own', title: 'Write my own question', body: 'Anything you need to say well.' },
+    { id: 'story', title: 'Rehearse from Story Bank', body: 'Check you hit a story’s key points.' },
+  ];
 
   return (
     <div className="flex flex-col gap-8">
@@ -71,9 +124,78 @@ export function WarmUpPage() {
 
       <div className="flex flex-wrap gap-12">
         <section className="flex min-w-0 flex-[999_1_540px] flex-col gap-10">
+          <fieldset className="m-0 flex flex-col gap-3.5 border-0 p-0">
+            <legend className="mb-3.5 p-0 font-display text-[clamp(30px,3.4vw,44px)] leading-tight tracking-[-0.02em]">What are you practising for?</legend>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-3">
+              {sources.map((x) => {
+                const on = source === x.id;
+                return (
+                  <label
+                    key={x.id}
+                    className={cn(
+                      'flex cursor-pointer flex-col gap-1.5 rounded-md p-[18px] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-[3px] has-[:focus-visible]:outline-olive',
+                      on ? 'paper-scope bg-paper text-paper-foreground' : 'bg-surface-100 hover:bg-surface-200'
+                    )}
+                  >
+                    <input type="radio" name={ids.source} value={x.id} checked={on} onChange={() => pickSource(x.id)} className="sr-only" />
+                    <span className="text-[17px] font-semibold leading-snug">{x.title}</span>
+                    <span className="text-[14px] leading-[20px] opacity-75">{x.body}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          {situation && (
+            <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+              <legend className="mb-2 p-0 text-ink-muted">Pick a question, or write your own below</legend>
+              {situation.questions.map((q) => (
+                <label key={q} className="flex min-h-11 cursor-pointer items-center gap-3 border-t border-line py-2 text-[17px] has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-olive">
+                  <input type="radio" name={ids.question} checked={config.prompt.trim() === q} onChange={() => set('prompt', q)} className="h-5 w-5 accent-[rgb(var(--olive))]" />
+                  {q}
+                </label>
+              ))}
+            </fieldset>
+          )}
+
+          {source === 'story' && (
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <div className="flex min-w-0 flex-1 flex-col gap-1">
+                <label htmlFor={ids.story} className="text-[15px] text-ink-muted">
+                  Story from your bank
+                </label>
+                {stories.length ? (
+                  <select
+                    id={ids.story}
+                    value={config.storyId ?? ''}
+                    onChange={(e) => {
+                      const next = stories.find((x) => x.id === e.target.value);
+                      setConfig((c) => ({ ...c, storyId: next?.id, prompt: next?.title ?? c.prompt }));
+                    }}
+                    className="min-h-11 max-w-full rounded-md border-0 bg-surface-100 px-4 font-display text-[22px] text-foreground"
+                  >
+                    {stories.map((x) => (
+                      <option key={x.id} value={x.id}>
+                        {x.title}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span id={ids.story} className="font-display text-[22px] text-ink-muted">
+                    No stories yet
+                  </span>
+                )}
+                {story && story.keyPoints.length > 0 && <span className="text-[15px] text-ink-muted">Vireo will check you hit: {story.keyPoints.join(', ')}.</span>}
+              </div>
+              <Link to="/stories" className="rounded-sm text-label text-olive">
+                {stories.length ? 'Open Story Bank' : 'Add a story'}
+              </Link>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3.5">
             <label htmlFor={ids.prompt} className="text-ink-muted">
-              What are you answering or presenting?
+              {situation ? 'Your question' : 'What are you answering or presenting?'}
             </label>
             <textarea
               id={ids.prompt}
@@ -81,37 +203,62 @@ export function WarmUpPage() {
               value={config.prompt}
               onChange={(e) => set('prompt', e.target.value)}
               placeholder="Tell me about your research and why it matters."
-              className="w-full resize-none border-0 border-b-[1.5px] border-line bg-transparent pb-3 font-display text-[clamp(32px,4.2vw,56px)] leading-[1.06] tracking-[-0.02em] text-foreground placeholder:text-ink-muted/70 focus-visible:outline-offset-4"
+              className="w-full resize-none border-0 border-b-[1.5px] border-line bg-transparent pb-3 font-display text-[clamp(30px,3.8vw,50px)] leading-[1.06] tracking-[-0.02em] text-foreground placeholder:text-ink-muted/70 focus-visible:outline-offset-4"
             />
-            <span className="text-[15px] text-ink-muted">Vireo uses this to check that your answer stays on point.</span>
+            {config.drill && (
+              <p className="m-0 rounded-md bg-surface-100 px-4 py-3 text-[16px]">
+                <span className="font-semibold">Today’s drill:</span> {config.drill}
+              </p>
+            )}
           </div>
 
-          <fieldset className="m-0 flex flex-col gap-3.5 border-0 p-0">
-            <legend className="mb-3.5 p-0 text-ink-muted">Kind of talk</legend>
-            <div className="flex flex-wrap gap-2.5">
-              {(Object.keys(TALK_TYPES) as TalkType[]).map((key) => {
-                const on = key === config.talkType;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => set('talkType', key)}
-                    className={cn('min-h-[46px] rounded-pill px-5 text-[16px]', on ? 'bg-olive font-semibold text-olive-foreground' : 'bg-surface-100 text-ink-muted hover:text-ink')}
-                  >
-                    {TALK_TYPES[key].label}
-                  </button>
-                );
-              })}
+          {situation ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-ink-muted">What a good answer looks like</span>
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[16px]">
+                {situation.criteria.map((c) => (
+                  <li key={c} className="flex gap-2.5">
+                    <span className="mt-2 h-2 w-2 shrink-0 rounded-pill bg-olive" aria-hidden="true" />
+                    {c}
+                  </li>
+                ))}
+              </ul>
+              <p className="m-0 mt-1 text-[16px] leading-[25px] text-ink-muted">
+                Pace zone{' '}
+                <span className="font-semibold text-olive">
+                  {talk.zone.min} to {talk.zone.max} wpm
+                </span>
+                {situation.timeLimitMs ? `, with a ${situation.timeLimitMs / 1000}-second countdown.` : '.'}
+              </p>
             </div>
-            <p className="m-0 mt-1 text-[16px] leading-[25px] text-ink-muted">
-              Pace zone{' '}
-              <span className="font-semibold text-olive">
-                {talk.zone.min} to {talk.zone.max} wpm
-              </span>
-              . Listening for {talk.focus}.
-            </p>
-          </fieldset>
+          ) : (
+            <fieldset className="m-0 flex flex-col gap-3.5 border-0 p-0">
+              <legend className="mb-3.5 p-0 text-ink-muted">Kind of talk</legend>
+              <div className="flex flex-wrap gap-2.5">
+                {(Object.keys(TALK_TYPES) as TalkType[]).map((key) => {
+                  const on = key === config.talkType;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      aria-pressed={on}
+                      onClick={() => set('talkType', key)}
+                      className={cn('min-h-[46px] rounded-pill px-5 text-[16px]', on ? 'bg-olive font-semibold text-olive-foreground' : 'bg-surface-100 text-ink-muted hover:text-ink')}
+                    >
+                      {TALK_TYPES[key].label}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="m-0 mt-1 text-[16px] leading-[25px] text-ink-muted">
+                Pace zone{' '}
+                <span className="font-semibold text-olive">
+                  {talk.zone.min} to {talk.zone.max} wpm
+                </span>
+                . Listening for {talk.focus}.
+              </p>
+            </fieldset>
+          )}
 
           <fieldset className="m-0 flex flex-col gap-3.5 border-0 p-0">
             <legend className="mb-3.5 p-0 text-ink-muted">How should Vireo coach you?</legend>
@@ -147,39 +294,6 @@ export function WarmUpPage() {
             </label>
             <Switch id={ids.audience} checked={config.audience} onCheckedChange={(v) => set('audience', v)} />
           </div>
-
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
-              <label htmlFor={ids.story} className="text-[15px] text-ink-muted">
-                Story from your bank
-              </label>
-              {stories.length ? (
-                <select
-                  id={ids.story}
-                  value={config.storyId ?? ''}
-                  onChange={(e) => set('storyId', e.target.value || undefined)}
-                  className="min-h-11 max-w-full rounded-md border-0 bg-surface-100 px-4 font-display text-[22px] text-foreground"
-                >
-                  <option value="">None, I’m answering freely</option>
-                  {stories.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.title}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span id={ids.story} className="font-display text-[22px] text-ink-muted">
-                  No stories yet
-                </span>
-              )}
-              {story && story.keyPoints.length > 0 && (
-                <span className="text-[15px] text-ink-muted">Vireo will check you hit: {story.keyPoints.join(', ')}.</span>
-              )}
-            </div>
-            <Link to="/stories" className="rounded-sm text-label text-olive">
-              {stories.length ? 'Open Story Bank' : 'Add a story'}
-            </Link>
-          </div>
         </section>
 
         <aside aria-label="Camera and microphone check" className="flex min-w-0 flex-[1_1_380px] flex-col gap-4">
@@ -214,9 +328,7 @@ export function WarmUpPage() {
 
           <div className="flex flex-col gap-2 rounded-md bg-surface-100 p-[18px]">
             <span className="text-[16px] font-semibold">Camera feedback</span>
-            <span className="text-[15px] text-ink-muted">
-              Look at the camera for 2 seconds so Vireo knows where eye contact is for you. Analysed on this device only.
-            </span>
+            <span className="text-[15px] text-ink-muted">Look at the camera for 2 seconds so Vireo knows where eye contact is for you. Analysed on this device only.</span>
             <div className="flex flex-wrap items-center gap-3 pt-1">
               <Button variant="outline" size="sm" className="min-h-11" onClick={calibrateCamera} disabled={preview.status !== 'ready' || calibrating === 'running'}>
                 {calibrating === 'running' ? 'Look at the camera…' : calibrating === 'done' ? 'Calibrate again' : 'Look at the camera for 2 seconds'}

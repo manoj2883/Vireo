@@ -13,6 +13,9 @@ const TRANSCRIPT = [
 
 const VALID = {
   verdict: 'Clear story. Rushed ending.',
+  oneFix: { instruction: 'Pause before your result.', why: 'It gives the result room to land.' },
+  mainPointMs: 400,
+  previousFix: null,
   summary: 'You opened with the point. The middle wandered. The result came too fast.',
   scores: { structure: 78, delivery: 64, clarity: 81 },
   storyMap: { sections: [{ title: 'The point', startMs: 400, endMs: 4200, outlinePoint: null, outlineIndex: null, status: null }] },
@@ -31,7 +34,7 @@ function fakeProvider(replies) {
     model: 'fake-1',
     calls,
     complete: vi.fn(async (req) => {
-      calls.push(structuredClone(req));
+      calls.push(structuredClone({ system: req.system, messages: req.messages }));
       const next = replies.shift();
       if (next instanceof Error) throw next;
       return typeof next === 'string' ? { text: next } : next;
@@ -255,5 +258,12 @@ describe('anthropic provider', () => {
     const parse = vi.fn().mockResolvedValue(ok({ stop_reason: 'max_tokens' }));
     const provider = createAnthropicProvider({ client: { beta: { messages: { parse } } } });
     expect(await provider.complete({ system: 's', messages: [] })).toEqual({ text: '', invalid: expect.stringMatching(/token limit/) });
+  });
+});
+
+describe('situation criteria', () => {
+  it('passes the situation and what a good answer looks like', () => {
+    const prompt = buildFieldNotesPrompt(TRANSCRIPT, { situation: { label: '60-second pitch', criteria: ['States the problem, the solution and a clear ask.'], timeLimitMs: 60_000 } });
+    expect(prompt).toContain('Situation: 60-second pitch. Target length: under 60 seconds. A good answer here:\n  - States the problem, the solution and a clear ask.');
   });
 });

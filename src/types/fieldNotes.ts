@@ -27,6 +27,12 @@ export interface Drill {
 
 export interface FieldNotes {
   verdict: string;
+  /** The single most important change, as an instruction for the next take. Absent in older notes. */
+  oneFix?: { instruction: string; why: string };
+  /** When the main point was first stated (ms), or null. */
+  mainPointMs?: number | null;
+  /** On a retake: whether the previous fix was achieved, with quoted evidence. */
+  previousFix?: { achieved: boolean; evidence: string; startMs: number | null } | null;
   summary: string;
   scores: { structure: number; delivery: number; clarity: number };
   storyMap: { sections: StorySection[] };

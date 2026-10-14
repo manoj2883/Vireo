@@ -11,6 +11,8 @@ import { PauseRing } from '@/components/hud/PauseRing';
 import { FillerTicker } from '@/components/hud/FillerTicker';
 import { LiveCaptions } from '@/components/hud/LiveCaptions';
 import { EyeContactDot } from '@/components/hud/EyeContactDot';
+import { Script } from '@/components/notes/TightenedAnswer';
+import { situationById } from '@/session/situations';
 import { LiveSessionEngine } from '@/live/LiveSessionEngine';
 import { useLiveSnapshot } from '@/live/useLiveSession';
 import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory, newId } from '@/storage/localDb';
@@ -88,6 +90,11 @@ function LiveView({
   const snap = useLiveSnapshot(engine);
   const [hideFace, setHideFace] = useState(config.hideFace);
   const [captions, setCaptions] = useState(true);
+  const [teleprompter, setTeleprompter] = useState(false);
+  const promptId = useId();
+  const situation = situationById(config.situationId);
+  const limitMs = situation?.timeLimitMs;
+  const leftMs = limitMs ? limitMs - snap.elapsedMs : null;
   const [ending, setEnding] = useState(false);
   const faceId = useId();
   const capId = useId();
@@ -127,6 +134,11 @@ function LiveView({
           {snap.status === 'connecting' ? ', connecting' : ''}
         </span>
       </header>
+      {config.retake?.oneFix && (
+        <p className="m-0 mx-4 -mt-1 mb-3 rounded-md bg-surface-100 px-4 py-2.5 text-[16px] sm:mx-8" data-testid="one-fix-line">
+          <span className="font-semibold">Your fix:</span> {config.retake.oneFix}
+        </p>
+      )}
 
       <main className="flex min-h-0 flex-1 flex-col gap-4 px-4 pb-6 sm:px-8">
         {failed && (
@@ -174,7 +186,28 @@ function LiveView({
             </div>
           )}
 
-          <EyeContactDot eyeContact={snap.eyeContact} className="absolute left-4 top-4 sm:left-7 sm:top-7" />
+          <div className="absolute left-4 top-4 flex flex-wrap items-center gap-2 sm:left-7 sm:top-7">
+            <EyeContactDot eyeContact={snap.eyeContact} />
+            {leftMs !== null && (
+              <span
+                role="timer"
+                aria-label={leftMs > 0 ? `${Math.ceil(leftMs / 1000)} seconds left` : 'Time is up'}
+                data-testid="countdown"
+                className={cn(
+                  'inline-flex h-9 items-center rounded-pill px-3.5 text-label tabular-nums',
+                  leftMs > 10_000 ? 'bg-surface-100/90' : 'bg-amber-soft text-ink shadow-[inset_0_0_0_1.5px_rgb(var(--amber))]'
+                )}
+              >
+                {leftMs > 0 ? `${clock(leftMs + 999)} left` : 'Time'}
+              </span>
+            )}
+          </div>
+
+          {teleprompter && config.retake?.script && (
+            <div className="absolute inset-x-4 top-20 max-h-[45%] overflow-y-auto rounded-md bg-surface-000/80 p-5 backdrop-blur-sm sm:inset-x-16" data-testid="teleprompter">
+              <Script script={config.retake.script} className="text-[22px] leading-[1.5] sm:text-[26px]" />
+            </div>
+          )}
 
           <FillerTicker
             className="absolute right-4 top-4 sm:right-7 sm:top-7"
@@ -212,6 +245,12 @@ function LiveView({
               <Switch id={capId} checked={captions} onCheckedChange={setCaptions} />
               Live captions
             </label>
+            {config.retake?.script && (
+              <label htmlFor={promptId} className="inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-pill bg-surface-100 px-[18px] text-label">
+                <Switch id={promptId} checked={teleprompter} onCheckedChange={setTeleprompter} />
+                Teleprompter
+              </label>
+            )}
           </div>
           <Button variant="end" size="lg" onClick={endSession} disabled={ending || !ready}>
             <span className="h-3 w-3 rounded-[3px] bg-surface-000" aria-hidden="true" />

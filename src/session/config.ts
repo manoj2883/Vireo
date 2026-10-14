@@ -1,10 +1,13 @@
 import type { CoachMode } from '@/live/metrics/nudges';
 import type { TalkType } from '@/live/metrics/pace';
 import type { Calibration } from '@/vision/cameraTracker';
+import type { SituationId } from './situations';
 
 /** Everything the warm-up decides for a session. */
 export interface SessionConfig {
   prompt: string;
+  /** The real situation being practised; sets criteria and, for pitches, a countdown. */
+  situationId?: SituationId;
   talkType: TalkType;
   mode: CoachMode;
   /** Ask a follow-up afterwards (Audience mode). */
@@ -15,11 +18,16 @@ export interface SessionConfig {
   parentSessionId?: string;
   /** From the warm-up's "look at the camera" step; null if skipped or unavailable. */
   calibration?: Calibration | null;
+  /** Set on a retake: the one fix to keep in mind and the tightened script from the last take. */
+  retake?: { fromSessionId: string; oneFix: string; script?: string };
+  /** A drill to show during the take (from a reminder link or Home). */
+  drill?: string;
 }
 
 export const DEFAULT_CONFIG: SessionConfig = {
-  prompt: '',
+  prompt: 'Tell me about yourself.',
   talkType: 'interview',
+  situationId: 'interview',
   mode: 'coach',
   audience: true,
   hideFace: false,

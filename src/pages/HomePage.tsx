@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Sonogram } from '@/components/sonogram';
 import { deleteAllData, listSessions, listStories, type StoredSession, type StoredStory } from '@/storage/localDb';
 import { ConfirmDelete } from '@/components/ConfirmDelete';
+import { bestImprovementThisWeek, describeChange } from '@/lib/compare';
 import { saveConfig, type SessionConfig } from '@/session/config';
 
 /** Home (`/app`): progress from real sessions, today's drill, the last ten sessions drawn. */
@@ -28,6 +29,7 @@ export function HomePage() {
   const withDrill = sessions.find((s) => s.notes?.drills.length);
   const drill = withDrill?.notes?.drills.find((d) => !withDrill.drillsDone?.includes(d.title)) ?? withDrill?.notes?.drills[0];
   const recent = sessions.slice(0, 10).reverse();
+  const weekly = bestImprovementThisWeek(sessions);
 
   function startDrill() {
     if (!withDrill) return;
@@ -42,6 +44,20 @@ export function HomePage() {
 
   return (
     <div className="flex flex-col gap-20">
+      {weekly && (
+        <section aria-labelledby="week-h" className="paper-scope flex flex-wrap items-center justify-between gap-6 rounded-lg bg-paper p-7 text-paper-foreground sm:p-10">
+          <div className="flex flex-col gap-2">
+            <p id="week-h" className="m-0 text-label opacity-75">
+              Your best improvement this week
+            </p>
+            <p className="m-0 font-display text-[clamp(30px,4vw,48px)] leading-[1.05] tracking-[-0.02em]">{describeChange(weekly.change)}</p>
+            <p className="m-0 text-small opacity-75">On “{weekly.session.config.prompt}”</p>
+          </div>
+          <Button variant="outline" size="lg" onClick={() => navigate(`/notes/${weekly.session.id}`)}>
+            See before and after
+          </Button>
+        </section>
+      )}
       <section className="flex flex-wrap items-stretch gap-10">
         <div className="flex min-w-0 flex-[1_1_460px] flex-col justify-between gap-8">
           <div>

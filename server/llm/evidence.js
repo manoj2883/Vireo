@@ -47,6 +47,20 @@ function findWholeWords(haystack, needle) {
 }
 
 /**
+ * A previous-fix verdict needs an exact quote from this transcript as evidence, or it is dropped
+ * (the result is then unknown rather than a guess).
+ * @template {{ achieved: boolean, evidence: string, startMs: number | null }} F
+ * @param {F | null | undefined} previousFix
+ * @param {{ speaker?: string, text: string, startMs: number }[]} lines
+ * @returns {F | null}
+ */
+export function verifyPreviousFix(previousFix, lines) {
+  if (!previousFix || !previousFix.evidence) return null;
+  const { notes } = verifyNotes([{ quote: previousFix.evidence, startMs: previousFix.startMs ?? 0 }], lines);
+  return notes.length ? { ...previousFix, startMs: notes[0].startMs } : null;
+}
+
+/**
  * Keep only notes backed by evidence. A speech note's quote must be in the transcript; a kept
  * note whose startMs falls outside the line where its quote begins is moved to that line's start.
  * A camera note must reference a real camera event id; it is moved to that event if its time is off.

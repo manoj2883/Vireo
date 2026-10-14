@@ -57,6 +57,9 @@ const NOTES: FieldNotes = {
   drills: [{ title: 'The full stop', instructions: 'Say the result, breathe, explain.', minutes: 4 }],
 };
 
+/** Only the field-notes requests (the page also asks for the tightened answer). */
+const notesCalls = (spy: { mock: { calls: unknown[][] } }) => spy.mock.calls.filter((c) => String(c[0]) === '/api/field-notes');
+
 function mockFetch(response: { ok: boolean; body: unknown }) {
   return vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: response.ok, status: response.ok ? 200 : 502, json: async () => response.body } as Response);
 }
@@ -95,7 +98,7 @@ describe('routes', () => {
 
   it('/session without a warm-up goes to the warm-up', async () => {
     renderAt('/session');
-    expect(await screen.findByLabelText('What are you answering or presenting?')).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'What are you practising for?' })).toBeInTheDocument();
   });
 
   it('unknown paths show the not-found page', () => {
@@ -105,15 +108,42 @@ describe('routes', () => {
 });
 
 describe('Warm-up', () => {
-  it('sets the pace zone from the kind of talk and starts only with a prompt', async () => {
+  it('starts on a situation card with starter questions, criteria and its pace zone', async () => {
     renderAt('/warm-up');
+    expect(screen.getByRole('radio', { name: /job interview/i })).toBeChecked();
+    expect(screen.getByLabelText('Your question')).toHaveValue('Tell me about yourself.');
+    expect(screen.getByText('Answers the question within the first 20 seconds.')).toBeInTheDocument();
     expect(screen.getByText('130 to 160 wpm')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Toast' }));
-    expect(screen.getByRole('button', { name: 'Toast' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: /toast or big moment/i }));
+    expect(screen.getByLabelText('Your question')).toHaveValue('Give a toast at a friend’s wedding.');
     expect(screen.getByText('110 to 140 wpm')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Introduce a guest speaker.' }));
+    expect(screen.getByLabelText('Your question')).toHaveValue('Introduce a guest speaker.');
+  });
+
+  it('shows a countdown note for the 60-second pitch', () => {
+    renderAt('/warm-up');
+    fireEvent.click(screen.getByRole('radio', { name: /60-second pitch/i }));
+    expect(screen.getByText(/with a 60-second countdown/)).toBeInTheDocument();
+  });
+
+  it('lets you write your own question, choosing the kind of talk, and starts only with a prompt', () => {
+    renderAt('/warm-up');
+    fireEvent.click(screen.getByRole('radio', { name: /write my own question/i }));
+    const prompt = screen.getByLabelText('What are you answering or presenting?');
+    expect(prompt).toHaveValue('');
     expect(screen.getByRole('button', { name: /start speaking/i })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('What are you answering or presenting?'), { target: { value: 'A toast for Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Toast' }));
+    expect(screen.getByText('110 to 140 wpm')).toBeInTheDocument();
+    fireEvent.change(prompt, { target: { value: 'A toast for Sam' } });
     expect(screen.getByRole('button', { name: /start speaking/i })).toBeEnabled();
+  });
+
+  it('fills the prompt, situation and drill from a reminder link, with no transcript in it', () => {
+    renderAt('/warm-up?situation=presentation&prompt=Walk%20us%20through%20your%20results.&drill=The%20full%20stop');
+    expect(screen.getByRole('radio', { name: /presentation or class talk/i })).toBeChecked();
+    expect(screen.getByLabelText('Your question')).toHaveValue('Walk us through your results.');
+    expect(screen.getByText(/today’s drill:/i).parentElement).toHaveTextContent('The full stop');
   });
 
   it('explains blocked camera and microphone access', async () => {
@@ -139,6 +169,35 @@ describe('Live session', () => {
   });
 });
 
+describe('Try again', () => {
+  it('keeps the one fix on screen, offers the teleprompter and counts down a pitch', async () => {
+    saveConfig({
+      prompt: 'Pitch your project to an investor.',
+      situationId: 'pitch',
+      talkType: 'pitch',
+      mode: 'watch',
+      audience: false,
+      hideFace: false,
+      retake: { fromSessionId: 's0', oneFix: 'Say the ask in your first ten seconds.', script: 'We help students / find the right office.' },
+    });
+    renderAt('/session');
+    expect(await screen.findByTestId('one-fix-line')).toHaveTextContent('Your fix: Say the ask in your first ten seconds.');
+    expect(screen.getByRole('timer')).toHaveTextContent('1:00 left');
+    expect(screen.queryByTestId('teleprompter')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: 'Teleprompter' }));
+    expect(screen.getByTestId('teleprompter')).toHaveTextContent('We help students / find the right office.');
+  });
+
+  it('shows no fix line, teleprompter or countdown on a first take', async () => {
+    saveConfig({ prompt: 'Tell me about yourself.', situationId: 'interview', talkType: 'interview', mode: 'watch', audience: true, hideFace: false });
+    renderAt('/session');
+    await screen.findByRole('heading', { name: 'Tell me about yourself.' });
+    expect(screen.queryByTestId('one-fix-line')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Teleprompter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+  });
+});
+
 describe('Field notes', () => {
   it('writes the notes on first open and shows them beside the transcript', async () => {
     await saveSession(storedSession());
@@ -146,7 +205,7 @@ describe('Field notes', () => {
     renderAt('/notes/sess_1');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' })).toBeInTheDocument();
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(notesCalls(fetchSpy)).toHaveLength(1);
     const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
     expect(body.context).toMatchObject({ prompt: 'Tell me about your research.', paceZone: { min: 130, max: 160 } });
     expect(body.transcript).toHaveLength(2);
@@ -191,7 +250,7 @@ describe('Field notes', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'Busy, trying again' })).toBeInTheDocument();
     expect(screen.getByText(/your drawing and transcript are already saved/i)).toBeInTheDocument();
     expect(await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' }, { timeout: 3000 })).toBeInTheDocument();
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(notesCalls(fetchSpy)).toHaveLength(2);
   });
 
   it('keeps the drawing and offers a retry when notes fail twice', async () => {
@@ -411,5 +470,126 @@ describe('camera feedback', () => {
     renderAt('/notes/sess_1');
     await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' });
     expect(screen.queryByTestId('eye-contact-strip')).not.toBeInTheDocument();
+  });
+});
+
+describe('One fix and your answer, tightened', () => {
+  const ONE_FIX = { ...NOTES, oneFix: { instruction: 'Give your result a full pause before you say it.', why: 'It lands harder.' }, mainPointMs: 2000 };
+  const TIGHT = { script: 'The answers it refused were the right ones. / My research is about teaching AI systems to say no.', mainPoint: 'The answers it refused were the right ones.' };
+
+  function routeFetch() {
+    return vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const body = String(url) === '/api/tighten' ? TIGHT : ONE_FIX;
+      return { ok: true, status: 200, json: async () => body } as Response;
+    });
+  }
+
+  it('opens with the one fix as the heading, then asks for the tightened answer', async () => {
+    await saveSession(storedSession());
+    const spy = routeFetch();
+    renderAt('/notes/sess_1');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Give your result a full pause before you say it.' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Clear story. Rushed ending.' })).toBeInTheDocument();
+    expect(await screen.findByText(/^The answers it refused were the right ones\.\s*$/)).toBeInTheDocument();
+    const tightenCall = spy.mock.calls.find((c) => String(c[0]) === '/api/tighten')!;
+    expect(JSON.parse((tightenCall[1] as RequestInit).body as string).context.oneFix).toBe('Give your result a full pause before you say it.');
+    expect((await getSession('sess_1'))?.tightened?.status).toBe('ready');
+  });
+
+  it('shows what changed: removed words struck through, pauses kept', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: ONE_FIX, tightened: { ...TIGHT, status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    fireEvent.click(await screen.findByRole('switch', { name: 'Show changes' }));
+    const changes = screen.getByTestId('tightened-changes');
+    expect(within(changes).getAllByText(/^um$/i)[0].closest('del')).not.toBeNull();
+    expect(within(changes).getByLabelText('pause')).toBeInTheDocument();
+  });
+
+  it('reruns the same question with the fix carried along', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: ONE_FIX, tightened: { ...TIGHT, status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    fireEvent.click(await screen.findByRole('button', { name: /try again with this fix/i }));
+    const saved = JSON.parse(sessionStorage.getItem('vireo-session-config')!);
+    expect(saved).toMatchObject({ prompt: 'Tell me about your research.', retake: { fromSessionId: 'sess_1', oneFix: 'Give your result a full pause before you say it.', script: TIGHT.script } });
+  });
+
+  it('explains a failed tightening and offers to try again', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: ONE_FIX, tightened: { script: '', mainPoint: '', status: 'failed', error: 'gemini returned unusable tightened answers twice' } }));
+    renderAt('/notes/sess_1');
+    const alert = await screen.findByText(/unusable tightened answers/);
+    expect(alert.parentElement).toHaveTextContent('Try again');
+  });
+});
+
+describe('Before and after', () => {
+  const day = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+
+  async function seedPair() {
+    await saveSession(storedSession({ id: 'sess_0', createdAt: day(2), notesStatus: 'ready', notes: { ...NOTES, mainPointMs: 20_000 }, metrics: { ...storedSession().metrics, fillersPerMin: 6, timeInZonePct: 40 } }));
+    await saveSession(
+      storedSession({
+        id: 'sess_1',
+        createdAt: day(1),
+        retakeOf: 'sess_0',
+        config: { ...storedSession().config, retake: { fromSessionId: 'sess_0', oneFix: 'Lead with your result.' } },
+        notesStatus: 'ready',
+        notes: { ...NOTES, mainPointMs: 4000, previousFix: { achieved: true, evidence: 'the answers it refused were the right ones', startMs: 4000 } },
+        tightened: { script: 'x', mainPoint: 'x', status: 'ready' },
+        metrics: { ...storedSession().metrics, fillersPerMin: 2, timeInZonePct: 70 },
+      })
+    );
+  }
+
+  it('shows both sonograms, what changed and whether the fix was achieved', async () => {
+    await seedPair();
+    renderAt('/notes/sess_1');
+    const section = await screen.findByRole('region', { name: 'Before and after' });
+    expect(within(section).getAllByRole('img')).toHaveLength(2);
+    expect(within(section).getByTestId('fix-result')).toHaveTextContent('Your fix: Lead with your result. Yes, you did it.');
+    const changes = within(section).getByRole('list', { name: 'What changed' });
+    expect(changes).toHaveTextContent('Fillers down from 6.0 a minute to 2.0 a minute.');
+    expect(changes).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
+  });
+
+  it('is not shown on a first take', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES, tightened: { script: 'x', mainPoint: 'x', status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    await screen.findByRole('heading', { name: 'Clear story. Rushed ending.' });
+    expect(screen.queryByRole('region', { name: 'Before and after' })).not.toBeInTheDocument();
+  });
+
+  it('puts the best improvement of the week on Home', async () => {
+    await seedPair();
+    renderAt('/app');
+    const week = await screen.findByRole('region', { name: 'Your best improvement this week' });
+    expect(week).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
+  });
+});
+
+describe('Take it with you', () => {
+  it('offers the report with words off by default, and three reminder days once a date is picked', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES, tightened: { script: 'x', mainPoint: 'x', status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    const section = await screen.findByRole('region', { name: 'Take it with you' });
+    expect(within(section).getByRole('checkbox', { name: /include my words/i })).not.toBeChecked();
+    expect(within(section).getByRole('button', { name: 'Add 3 reminders to my calendar' })).toBeDisabled();
+
+    const inTen = new Date();
+    inTen.setDate(inTen.getDate() + 10);
+    const day = `${inTen.getFullYear()}-${String(inTen.getMonth() + 1).padStart(2, '0')}-${String(inTen.getDate()).padStart(2, '0')}`;
+    fireEvent.change(within(section).getByLabelText(/when is the real interview/i), { target: { value: day } });
+    expect(within(section).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(section).getByRole('button', { name: 'Add 3 reminders to my calendar' })).toBeEnabled();
+  });
+
+  it('explains a date that is too soon', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES, tightened: { script: 'x', mainPoint: 'x', status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    const section = await screen.findByRole('region', { name: 'Take it with you' });
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 1);
+    const day = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, '0')}-${String(soon.getDate()).padStart(2, '0')}`;
+    fireEvent.change(within(section).getByLabelText(/when is the real interview/i), { target: { value: day } });
+    expect(within(section).getByRole('alert')).toHaveTextContent(/at least 4 days away/);
   });
 });
