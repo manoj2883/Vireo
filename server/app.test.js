@@ -78,9 +78,53 @@ describe('POST /api/field-notes', () => {
 });
 
 describe('GET /api/health', () => {
-  it('reports the live key and the field notes provider', async () => {
-    const { base } = await start({ env: { GEMINI_API_KEY: '', LLM_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'k', OPENROUTER_MODELS: 'a/b:free' } });
+  it('reports transcription and the field notes provider', async () => {
+    const { base } = await start({ env: { LLM_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'k', OPENROUTER_MODELS: 'a/b:free' } });
     const body = await fetch(`${base}/api/health`).then((r) => r.json());
-    expect(body).toMatchObject({ status: 'ok', hasApiKey: false, fieldNotes: { name: 'openrouter', model: 'a/b:free', configured: true } });
+    expect(body).toMatchObject({
+      status: 'ok',
+      transcription: { provider: 'deepgram', configured: false },
+      fieldNotes: { name: 'openrouter', model: 'a/b:free', configured: true },
+    });
+  });
+});
+
+describe('POST /api/stt-token', () => {
+  it('returns a short-lived Deepgram token, never the key', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ access_token: 'jwt.abc', expires_in: 60 }) });
+    const { base } = await start({ env: { DEEPGRAM_API_KEY: 'dg-secret' }, fetchImpl });
+    const res = await fetch(`${base}/api/stt-token`, { method: 'POST' });
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body).toEqual({ token: 'jwt.abc', expiresIn: 60 });
+    expect(JSON.stringify(body)).not.toContain('dg-secret');
+    expect(fetchImpl).toHaveBeenCalledWith('https://api.deepgram.com/v1/auth/grant', {
+      method: 'POST',
+      headers: { Authorization: 'Token dg-secret', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ttl_seconds: 60 }),
+    });
+  });
+
+  it('explains a missing key', async () => {
+    const { base } = await start({ env: {} });
+    const res = await fetch(`${base}/api/stt-token`, { method: 'POST' });
+    expect(res.status).toBe(500);
+    expect((await res.json()).error).toMatch(/DEEPGRAM_API_KEY is not set/);
+  });
+
+  it('explains a key Deepgram rejects', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ err_msg: 'Insufficient permissions.' }) });
+    const { base } = await start({ env: { DEEPGRAM_API_KEY: 'dg' }, fetchImpl });
+    const res = await fetch(`${base}/api/stt-token`, { method: 'POST' });
+    expect((await res.json()).error).toBe('Deepgram refused the token request: Insufficient permissions.. Check the key, and that it has the Member role or higher.');
+  });
+
+  it('rate-limits one connection to 20 sessions an hour', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ access_token: 't', expires_in: 60 }) });
+    const { base } = await start({ env: { DEEPGRAM_API_KEY: 'dg' }, fetchImpl });
+    const statuses = [];
+    for (let i = 0; i < 21; i++) statuses.push((await fetch(`${base}/api/stt-token`, { method: 'POST' })).status);
+    expect(statuses.slice(0, 20).every((s) => s === 200)).toBe(true);
+    expect(statuses[20]).toBe(429);
   });
 });

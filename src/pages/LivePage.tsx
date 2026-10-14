@@ -12,6 +12,7 @@ import { FillerTicker } from '@/components/hud/FillerTicker';
 import { LiveSessionEngine } from '@/live/LiveSessionEngine';
 import { useLiveSnapshot } from '@/live/useLiveSession';
 import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory, newId } from '@/storage/localDb';
+import { buildKeyterms } from '@/live/keyterms';
 import { loadConfig, saveConfig, type SessionConfig } from '@/session/config';
 
 const CAPTION_WORDS = 12;
@@ -34,12 +35,20 @@ function LiveSession({ config }: { config: SessionConfig }) {
   );
 
   useEffect(() => {
-    const e = new LiveSessionEngine(
-      { mode: config.mode, talkType: config.talkType, prompt: config.prompt, storyId: config.storyId },
-      { ghostStore: { get: getGhost, put: putGhost } }
-    );
-    setEngine(e);
-    e.start(videoRef.current ?? undefined).catch((err: unknown) => {
+    let e: LiveSessionEngine | null = null;
+    let cancelled = false;
+    (async () => {
+      // Words the speaker is likely to say help the transcriber: the prompt and the story's key points.
+      const story = config.storyId ? await getStory(config.storyId).catch(() => undefined) : undefined;
+      if (cancelled) return;
+      const keyterms = buildKeyterms({ prompt: config.prompt, storyTitle: story?.title, keyPoints: story?.keyPoints });
+      e = new LiveSessionEngine(
+        { mode: config.mode, talkType: config.talkType, prompt: config.prompt, storyId: config.storyId, keyterms },
+        { ghostStore: { get: getGhost, put: putGhost } }
+      );
+      setEngine(e);
+      await e.start(videoRef.current ?? undefined);
+    })().catch((err: unknown) => {
       const name = err instanceof DOMException ? err.name : '';
       setStartError(
         name === 'NotAllowedError'
@@ -48,7 +57,8 @@ function LiveSession({ config }: { config: SessionConfig }) {
       );
     });
     return () => {
-      if (!e.isEnded) void e.abort();
+      cancelled = true;
+      if (e && !e.isEnded) void e.abort();
     };
     // One engine per mount; the config is read once when the page opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -84,7 +94,7 @@ function LiveView({
 
   const rushing = snap.nudge === 'fast';
   const failed = startError ?? (snap.status === 'failed' ? snap.statusMessage ?? 'The live connection failed.' : null);
-  const captionWords = snap.segments.slice(-CAPTION_WORDS);
+  const captionWords = [...snap.segments.map((w) => ({ ...w, interim: false })), ...snap.interim.map((w) => ({ ...w, interim: true }))].slice(-CAPTION_WORDS);
   const sinceFiller = snap.lastFiller ? snap.elapsedMs - snap.lastFiller.atMs : null;
 
   async function endSession() {
@@ -115,7 +125,7 @@ function LiveView({
         </div>
         <span className="inline-flex h-9 items-center rounded-pill px-3.5 text-small font-semibold text-ink-muted shadow-[inset_0_0_0_1px_rgb(var(--line))]">
           {config.mode === 'coach' ? 'Coaching out loud' : 'Watching silently'}
-          {snap.status === 'connecting' || snap.status === 'reconnecting' ? ', connecting' : ''}
+          {snap.status === 'connecting' ? ', connecting' : ''}
         </span>
       </header>
 
@@ -179,7 +189,7 @@ function LiveView({
                   <span className="text-ink-muted">{snap.status === 'connected' ? 'Start speaking when you’re ready.' : 'Getting ready'}</span>
                 ) : (
                   captionWords.map((w, i) => (
-                    <span key={`${w.startMs}-${i}`} className={w.kind === 'filler' ? 'italic text-amber' : undefined}>
+                    <span key={`${w.startMs}-${i}`} className={cn(w.kind === 'filler' && 'italic text-amber', w.interim && 'text-ink-muted')}>
                       {w.text}{' '}
                     </span>
                   ))

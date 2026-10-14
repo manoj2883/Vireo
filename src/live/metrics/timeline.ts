@@ -79,6 +79,8 @@ export function placeWords(
 
 export class TranscriptTimeline {
   private words: TimedWord[] = [];
+  /** Words still being transcribed: shown, then replaced when the final arrives. */
+  private interim: TimedWord[] = [];
   /** Webspeech-style utterances: id -> index of its first word and its word count. */
   private utterances = new Map<string, { first: number; count: number }>();
   private readonly fillers: readonly string[];
@@ -108,7 +110,33 @@ export class TranscriptTimeline {
     texts.forEach((text, i) => this.words.push({ text, ...times[i], wpmAtArrival: wpm }));
   }
 
-  /** Append a chunk of newly transcribed text (Gemini input transcription arrives this way). */
+  /**
+   * Add final words that already carry real timings (Deepgram). Words that overlap what is
+   * already in the timeline are skipped, so a repeated final can't double up.
+   */
+  appendTimed(words: readonly { text: string; startMs: number; endMs: number }[], wpm: number | null = null): void {
+    for (const w of words) {
+      if (!w.text || !Number.isFinite(w.startMs) || !Number.isFinite(w.endMs)) continue;
+      if (this.words.length && w.startMs < this.lastEndMs - 20) continue;
+      this.words.push({ text: w.text, startMs: w.startMs, endMs: Math.max(w.endMs, w.startMs + 1), wpmAtArrival: wpm });
+    }
+  }
+
+  /** Replace the in-progress (interim) words. */
+  setInterim(words: readonly { text: string; startMs: number; endMs: number }[]): void {
+    this.interim = words.filter((w) => w.text).map((w) => ({ ...w, wpmAtArrival: null }));
+  }
+
+  /** In-progress words as segments, with fillers marked. Never counted in metrics. */
+  interimSegments(): WordSegment[] {
+    const mask = fillerMask(
+      this.interim.map((w) => w.text),
+      this.fillers
+    );
+    return this.interim.map((w, i) => ({ text: w.text, startMs: w.startMs, endMs: w.endMs, kind: mask[i] ? 'filler' : 'speech' }));
+  }
+
+  /** Append a chunk of text without timings: words are placed into the speech the detector heard. */
   append(text: string, nowMs: number, voiced: readonly VoicedInterval[] = [], wpm: number | null = null): void {
     this.place(tokenize(text), nowMs, voiced, wpm);
   }

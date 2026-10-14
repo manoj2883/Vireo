@@ -1,7 +1,7 @@
 /**
  * The live session: microphone and camera in, a snapshot of everything the Live screen
  * draws out. Pauses, pace, fillers, ghost pace and nudges are computed here, on the device.
- * Gemini Live only transcribes and, in coach mode, voices the nudges this engine asks for.
+ * Deepgram transcribes the audio with real word timings; camera frames never leave the device.
  */
 import type { PauseSpan, WordSegment } from '@/components/sonogram/types';
 import type { AudioFrameReading } from '@/audio/pitch/PitchTracker';
@@ -11,7 +11,8 @@ import { PaceMeter, paceState, TALK_TYPES, type PaceState, type PaceZone, type T
 import { NudgeController, type CoachMode } from './metrics/nudges';
 import { ghostKey, ghostWpmAt, isBetterTake, summariseTake, type PaceTake } from './metrics/ghost';
 import { DEFAULT_FILLERS, findFillers } from './metrics/fillers';
-import { GeminiLiveClient, type GeminiLiveCallbacks, type LiveStatus } from './geminiLiveClient';
+import { DeepgramLiveClient, type LiveStatus, type LiveWord, type SttCallbacks } from './deepgramLiveClient';
+import { speakWithBrowser } from './speech';
 
 export interface LiveSessionConfig {
   mode: CoachMode;
@@ -21,6 +22,8 @@ export interface LiveSessionConfig {
   fillers?: readonly string[];
   /** Expected delay between speaking and the transcript arriving (see TranscriptTimeline). */
   transcriptLatencyMs?: number;
+  /** Words and phrases the speaker is likely to say, to help recognition. */
+  keyterms?: readonly string[];
 }
 
 export interface LiveSnapshot {
@@ -28,6 +31,8 @@ export interface LiveSnapshot {
   statusMessage?: string;
   elapsedMs: number;
   segments: WordSegment[];
+  /** Words still being transcribed; shown lighter and replaced when final. */
+  interim: WordSegment[];
   pauses: PauseSpan[];
   /** Length of the pause in progress, or 0. */
   pausingMs: number;
@@ -79,7 +84,6 @@ export interface LiveSessionResult {
 export interface MediaHandle {
   pitchForWord(startMs: number, endMs: number): number[] | undefined;
   micLevel(): number;
-  playCoachAudio(base64Pcm: string): void;
   stop(): Promise<void>;
   pitchAvailable: boolean;
 }
@@ -89,14 +93,11 @@ export interface MediaStartArgs {
   videoElement?: HTMLVideoElement;
   onAudioFrame: (reading: AudioFrameReading) => void;
   onPcmChunk: (base64Pcm16k: string) => void;
-  onVideoFrame: (base64Jpeg: string) => void;
 }
 
 export interface LiveClientLike {
   connect(): Promise<void>;
-  sendAudio(base64: string): void;
-  sendVideoFrame(base64: string): void;
-  sendNudge(text: string): boolean;
+  sendAudio(pcm: string): void;
   close(): void;
 }
 
@@ -107,7 +108,9 @@ export interface GhostStoreLike {
 
 export interface EngineDeps {
   startMedia?: (args: MediaStartArgs) => Promise<MediaHandle>;
-  createClient?: (mode: CoachMode, cb: GeminiLiveCallbacks) => LiveClientLike;
+  createClient?: (keyterms: readonly string[], cb: SttCallbacks, sessionClock: () => number) => LiveClientLike;
+  /** Say a nudge out loud (coach mode). */
+  speak?: (text: string) => void;
   ghostStore?: GhostStoreLike;
   /** Session clock source in ms (performance.now by default). */
   now?: () => number;
@@ -173,16 +176,19 @@ export class LiveSessionEngine {
       .then((g) => (this.ghost = g ?? null))
       .catch(() => {});
 
-    const createClient = this.deps.createClient ?? ((mode, cb) => new GeminiLiveClient(mode, cb));
-    this.client = createClient(this.config.mode, {
-      onStatus: (status, message) => {
-        this.status = status;
-        this.statusMessage = message;
-        this.publish();
+    const createClient = this.deps.createClient ?? ((keyterms, cb, clock) => new DeepgramLiveClient(keyterms, cb, { now: clock }));
+    this.client = createClient(
+      this.config.keyterms ?? [],
+      {
+        onStatus: (status, message) => {
+          this.status = status;
+          this.statusMessage = message;
+          this.publish();
+        },
+        onWords: (words, isFinal) => this.ingestWords(words, isFinal),
       },
-      onTranscript: (text) => this.ingestTranscript(text),
-      onCoachAudio: (pcm) => this.media?.playCoachAudio(pcm),
-    });
+      () => this.elapsed()
+    );
 
     const startMedia = this.deps.startMedia ?? (await import('./browserMedia')).startBrowserMedia;
     this.media = await startMedia({
@@ -190,7 +196,6 @@ export class LiveSessionEngine {
       videoElement,
       onAudioFrame: (r) => this.ingestAudioFrame(r),
       onPcmChunk: (pcm) => this.client?.sendAudio(pcm),
-      onVideoFrame: (jpeg) => this.client?.sendVideoFrame(jpeg),
     });
 
     await this.client.connect();
@@ -203,6 +208,23 @@ export class LiveSessionEngine {
     this.vad.process(reading.rms, reading.timeMs, reading.durationMs);
   }
 
+  /** Timed words from the transcriber. Finals are kept; interim words are shown until replaced. */
+  ingestWords(words: readonly LiveWord[], isFinal: boolean): void {
+    const timed = words.every((w) => Number.isFinite(w.startMs) && Number.isFinite(w.endMs));
+    if (!timed) {
+      // A stream without timings: fall back to placing words into the speech we heard.
+      if (isFinal) this.ingestTranscript(words.map((w) => w.text).join(' '));
+      return;
+    }
+    if (isFinal) {
+      this.timeline.appendTimed(words, this.pace.wpm);
+      this.timeline.setInterim([]);
+    } else {
+      this.timeline.setInterim(words);
+    }
+  }
+
+  /** Text without timings (fallback): words are placed into the speech the detector heard. */
   ingestTranscript(text: string, atMs = this.elapsed()): void {
     this.timeline.append(text, atMs, this.vad.getVoicedIntervals(), this.pace.wpm);
   }
@@ -214,7 +236,8 @@ export class LiveSessionEngine {
     const state = this.timeline.getWords().length ? paceState(Math.round(wpm), this.zone) : null;
 
     const nudge = this.nudges.tick(state, speaking, nowMs);
-    if (nudge.speak && this.client?.sendNudge(nudge.speak)) {
+    if (nudge.speak) {
+      (this.deps.speak ?? speakWithBrowser)(nudge.speak);
       this.coachSays = { text: nudge.speak, untilMs: nowMs + COACH_BUBBLE_MS };
     }
 
@@ -251,6 +274,7 @@ export class LiveSessionEngine {
       statusMessage: this.statusMessage,
       elapsedMs: nowMs,
       segments,
+      interim: this.timeline.interimSegments(),
       pauses,
       pausingMs: open ? nowMs - open.startMs : 0,
       speaking: this.vad.isSpeaking(),

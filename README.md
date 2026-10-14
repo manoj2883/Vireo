@@ -29,10 +29,10 @@ flowchart LR
   subgraph Browser["Browser (React + TypeScript)"]
     Mic[Microphone] --> Worklet["AudioWorklet<br/>pitch + loudness every ~21 ms"]
     Worklet --> VAD["Pause detector<br/>energy + hangover, pauses > 300 ms"]
-    Mic --> PCM["16 kHz PCM uplink"]
-    Cam[Camera, 1 frame a second] --> Uplink
-    PCM --> Uplink[WebSocket]
-    Uplink -->|transcript chunks| Timeline["Transcript timeline<br/>words placed into heard speech"]
+    Mic --> PCM["16 kHz PCM"]
+    PCM --> Uplink["WebSocket to Deepgram<br/>short-lived token"]
+    Uplink -->|timed words, interim + final| Timeline["Transcript timeline"]
+    Cam[Camera] --> Preview[Preview only, never uploaded]
     VAD --> Timeline
     Timeline --> Metrics["Pace (4 s window) · fillers · nudges · ghost pace"]
     Metrics --> HUD["Live screen<br/>sonogram ribbon, pace band, pause ring"]
@@ -40,32 +40,32 @@ flowchart LR
     Store --> Notes[Field notes screen]
   end
   subgraph Server["Node server (Express + ws)"]
-    Proxy[/ws/live proxy/]
-    Api["/api/field-notes<br/>Zod-validated, evidence-checked"]
+    Token["/api/stt-token<br/>Deepgram grant"]
+    Api["/api/field-notes<br/>retries, fallbacks, evidence-checked"]
   end
-  Uplink <--> Proxy
-  Proxy <--> Gemini["Gemini Live<br/>transcription, spoken nudges"]
+  Uplink -.->|token| Token
+  Uplink <--> Deepgram["Deepgram Nova-3<br/>live transcription"]
   Notes -->|transcript + metrics| Api
   Api --> LLM["LLM_PROVIDER<br/>Gemini · Claude · OpenRouter"]
 ```
 
-Pace, pauses, fillers and pitch are measured on your device. Gemini Live only transcribes and, in coach mode, speaks the nudges the browser asks for. Field notes come from the model you configure. Their JSON is validated against a schema and retried once if invalid, and every quote is matched against the transcript before it reaches the screen.
+Pace, pauses, fillers and pitch are measured on your device. Deepgram Nova-3 transcribes your audio with real word timings, straight from the browser using a short-lived token from the server. Spoken nudges use the browser's own voice. Field notes come from the model you configure. Their JSON is validated against a schema and retried once if invalid, and every quote is matched against the transcript before it reaches the screen.
 
 | Path | What's there |
 | :--- | :--- |
 | `src/components/sonogram/` | The sonogram renderer: pure geometry plus static, reveal and scrolling modes |
-| `src/live/` | Live session engine, on-device metrics (`metrics/`) and the Gemini Live client |
+| `src/live/` | Live session engine, on-device metrics (`metrics/`) and the Deepgram client |
 | `src/audio/pitch/` | Autocorrelation pitch estimate in an AudioWorklet |
 | `src/pages/` | Launch, Home, Warm-up, Live, Field notes and Story Bank screens |
 | `src/storage/` | IndexedDB storage, deletion, and the one-time import from the previous version |
-| `server/app.js`, `server/index.js` | HTTP API, and the WebSocket proxy to Gemini Live |
+| `server/app.js`, `server/index.js`, `server/stt.js` | HTTP API and Deepgram token grants |
 | `server/llm/` | Provider-agnostic field notes (`generateTeardown`), schema and evidence check |
 | `eval/` | Accuracy harness for the on-device metrics |
 | `docs/design/` | Design system tokens and the screen designs this build follows |
 
 ## Getting started
 
-You need Node.js 20 or newer and a [Gemini API key](https://aistudio.google.com/) for live sessions.
+You need Node.js 20 or newer, a [Deepgram API key](https://console.deepgram.com/signup) (Member role) for live transcription, and a key for at least one field notes provider.
 
 ```bash
 npm install
@@ -78,7 +78,7 @@ On Windows, `start.ps1` or `start.bat` do the same.
 
 ### Choosing the field notes provider
 
-Live sessions always use Gemini Live (`GEMINI_API_KEY`). Field notes can come from any of three providers:
+Live transcription uses Deepgram (`DEEPGRAM_API_KEY`). Field notes can come from any of three providers, tried in the order `LLM_PROVIDER`, then `LLM_FALLBACKS`, with retries for busy providers:
 
 | `LLM_PROVIDER` | Also set | Notes |
 | :--- | :--- | :--- |
@@ -113,10 +113,10 @@ Vireo measures as much as it can on your device, and is explicit about what it s
 
 | What | When | Goes to |
 | :--- | :--- | :--- |
-| Microphone audio (16 kHz) and one camera frame a second | During a live session | Your Vireo server, which relays it to **Google Gemini Live** for transcription. In "Coach me out loud" mode, Gemini also receives the short nudge text and speaks it back. |
+| Microphone audio (16 kHz) | During a live session | **Deepgram**, directly from your browser, for transcription. Your server only issues the short-lived token that opens the connection. |
 | Transcript text and timestamps, your prompt, talk type, pace zone, on-device metrics, and the chosen Story Bank outline | When field notes are written | Your Vireo server, which sends it to the provider in `LLM_PROVIDER`: **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model you choose). |
 
-The server holds a session's recent transcript in memory only while the session runs, so it can reconnect after Gemini Live's time limit. It writes no transcript text to its logs, only counts and errors.
+The camera is used only for the preview on your screen. The server stores nothing and writes no transcript text to its logs, only counts and errors.
 
 Each provider handles what it receives under its own terms. Check them for the account and tier you use: some free tiers let the provider use submitted content to improve its products.
 

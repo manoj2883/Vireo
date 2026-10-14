@@ -1,6 +1,6 @@
 /**
  * Audio Recording, Downsampling (16-bit PCM, 16kHz, Little-Endian)
- * Web Audio Analyser for Realtime Waveform, and 24kHz PCM Audio Playback
+ * Web Audio Analyser for the mic level meter
  */
 
 export class AudioRecorder {
@@ -136,64 +136,5 @@ export class AudioRecorder {
       binary += String.fromCharCode(bytes[i]);
     }
     return window.btoa(binary);
-  }
-}
-
-/**
- * Audio Player for 24kHz 16-bit PCM Audio Output from Gemini Live API
- */
-export class PCM24Player {
-  private audioContext: AudioContext | null = null;
-  private nextStartTime: number = 0;
-
-  constructor() {
-    const AudioContextClass = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-    this.audioContext = new AudioContextClass({ sampleRate: 24000 });
-  }
-
-  public playChunk(base64Pcm: string): void {
-    if (!this.audioContext) return;
-    if (this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
-    }
-
-    try {
-      const binaryString = window.atob(base64Pcm);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      const int16Array = new Int16Array(bytes.buffer);
-      const float32Array = new Float32Array(int16Array.length);
-      for (let i = 0; i < int16Array.length; i++) {
-        float32Array[i] = int16Array[i] / 32768.0;
-      }
-
-      const audioBuffer = this.audioContext.createBuffer(1, float32Array.length, 24000);
-      audioBuffer.getChannelData(0).set(float32Array);
-
-      const source = this.audioContext.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(this.audioContext.destination);
-
-      const currentTime = this.audioContext.currentTime;
-      if (this.nextStartTime < currentTime) {
-        this.nextStartTime = currentTime;
-      }
-
-      source.start(this.nextStartTime);
-      this.nextStartTime += audioBuffer.duration;
-    } catch (e) {
-      console.error('Error decoding PCM audio chunk:', e);
-    }
-  }
-
-  public stop(): void {
-    if (this.audioContext && this.audioContext.state !== 'closed') {
-      this.audioContext.close();
-      this.audioContext = null;
-    }
   }
 }
