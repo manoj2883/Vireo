@@ -19,6 +19,7 @@
     "coach:clips": "node scripts/generate-coach-clips.mjs"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.0",
     "@radix-ui/react-slot": "^1.5.0",
     "@radix-ui/react-switch": "^1.4.1",
     "class-variance-authority": "^0.7.1",
