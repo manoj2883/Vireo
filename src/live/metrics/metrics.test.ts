@@ -262,12 +262,14 @@ describe('ghost pace', () => {
 // ---------- nudges ----------
 
 describe('NudgeController', () => {
-  function run(ctrl: NudgeController, state: 'fast' | 'slow' | 'in', fromMs: number, toMs: number, speaking = true) {
+  /** Run ticks every 100 ms; returns what was spoken and the last state. */
+  function run(ctrl: NudgeController, state: 'fast' | 'slow' | 'in', fromMs: number, toMs: number, speaking = true, pauseFrom?: number) {
     const spoken: string[] = [];
-    let last = ctrl.tick(state, speaking, fromMs);
+    let last = ctrl.tick(state, speaking, fromMs, 0);
     for (let t = fromMs + 100; t <= toMs; t += 100) {
-      last = ctrl.tick(state, speaking, t);
-      if (last.speak) spoken.push(last.speak);
+      const pauseMs = !speaking && pauseFrom !== undefined ? t - pauseFrom : 0;
+      last = ctrl.tick(state, speaking, t, pauseMs);
+      if (last.speak) spoken.push(SPOKEN_NUDGES[last.speak]);
     }
     return { spoken, last };
   }
@@ -277,31 +279,66 @@ describe('NudgeController', () => {
     expect(ctrl.tick('fast', true, 0)).toMatchObject({ visual: 'fast', speak: null });
   });
 
-  it('speaks only after five seconds out of the zone in coach mode', () => {
+  it('never speaks while you are talking, however long you rush', () => {
     const ctrl = new NudgeController('coach');
-    expect(run(ctrl, 'fast', 0, 4900).spoken).toEqual([]);
-    expect(run(ctrl, 'fast', 5000, 5300).spoken).toEqual([SPOKEN_NUDGES.fast]);
+    const { spoken, last } = run(ctrl, 'fast', 0, 5900);
+    expect(spoken).toEqual([]);
+    expect(last.waitingForPause).toBe(true);
+  });
+
+  it('speaks once a pause of 600 ms arrives after five seconds out of the zone', () => {
+    const ctrl = new NudgeController('coach');
+    run(ctrl, 'fast', 0, 5200);
+    expect(run(ctrl, 'fast', 5300, 5800, false, 5300).spoken).toEqual([]); // 500 ms: not yet
+    expect(run(ctrl, 'fast', 5900, 6000, false, 5300).spoken).toEqual([SPOKEN_NUDGES.fast]);
+  });
+
+  it('does not count a short breath as a pause to speak in', () => {
+    const ctrl = new NudgeController('coach');
+    run(ctrl, 'fast', 0, 5200);
+    expect(run(ctrl, 'fast', 5300, 5700, false, 5300).spoken).toEqual([]);
+    expect(run(ctrl, 'fast', 5800, 7000).spoken).toEqual([]);
+  });
+
+  it('skips the nudge if no pause comes within six seconds', () => {
+    const ctrl = new NudgeController('coach');
+    run(ctrl, 'fast', 0, 5200); // due at about 5.1 s
+    run(ctrl, 'fast', 5300, 11_500); // talking straight through
+    const late = run(ctrl, 'fast', 11_600, 13_000, false, 11_600);
+    expect(late.spoken).toEqual([]);
+    expect(late.last.waitingForPause).toBe(false);
+  });
+
+  it('cancels a waiting nudge when you come back into the zone', () => {
+    const ctrl = new NudgeController('coach');
+    run(ctrl, 'fast', 0, 5200);
+    run(ctrl, 'in', 5300, 5500);
+    expect(run(ctrl, 'fast', 5600, 6600, false, 5600).spoken).toEqual([]);
   });
 
   it('never speaks when watching silently', () => {
     const ctrl = new NudgeController('watch');
-    const { spoken, last } = run(ctrl, 'fast', 0, 12_000);
+    run(ctrl, 'fast', 0, 6000);
+    const { spoken, last } = run(ctrl, 'fast', 6100, 8000, false, 6100);
     expect(spoken).toEqual([]);
-    expect(last.visual).toBe('fast');
+    expect(last.waitingForPause).toBe(false);
   });
 
-  it('speaks once per excursion and respects the cooldown', () => {
+  it('speaks once per excursion and respects the 20 s cooldown', () => {
     const ctrl = new NudgeController('coach');
-    expect(run(ctrl, 'fast', 0, 9000).spoken).toHaveLength(1);
-    run(ctrl, 'in', 9100, 9500);
-    expect(run(ctrl, 'fast', 9600, 16_000).spoken).toEqual([]); // inside the 20 s cooldown
-    run(ctrl, 'in', 16_100, 16_500);
-    expect(run(ctrl, 'fast', 30_000, 36_000).spoken).toHaveLength(1);
+    run(ctrl, 'fast', 0, 5200);
+    expect(run(ctrl, 'fast', 5300, 6000, false, 5300).spoken).toHaveLength(1);
+    run(ctrl, 'in', 6100, 6500);
+    run(ctrl, 'fast', 6600, 12_000);
+    expect(run(ctrl, 'fast', 12_100, 13_000, false, 12_100).spoken).toEqual([]); // inside the cooldown
+    run(ctrl, 'in', 13_100, 13_500);
+    run(ctrl, 'fast', 30_000, 35_500);
+    expect(run(ctrl, 'fast', 35_600, 36_300, false, 35_600).spoken).toHaveLength(1);
   });
 
-  it('does not count silence towards "too slow"', () => {
+  it('does not count silence towards too slow', () => {
     const ctrl = new NudgeController('coach');
-    const { spoken, last } = run(ctrl, 'slow', 0, 10_000, false);
+    const { spoken, last } = run(ctrl, 'slow', 0, 10_000, false, 0);
     expect(spoken).toEqual([]);
     expect(last.visual).toBeNull();
     expect(last.outOfZoneMs).toBe(0);

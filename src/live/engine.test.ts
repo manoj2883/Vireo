@@ -18,14 +18,16 @@ function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
   let sttCb!: SttCallbacks;
   let keytermsSeen: readonly string[] = [];
   const client = { connect: vi.fn(async () => sttCb.onStatus('connected')), sendAudio: vi.fn(), close: vi.fn() };
-  const speak = vi.fn();
+  // A fake coach voice that plays until stopped.
+  let playing = false;
+  const voice = { play: vi.fn((kind: string) => void (playing = Boolean(kind))), stop: vi.fn(() => void (playing = false)), isPlaying: () => playing };
   const saved: PaceTake[] = [];
   const engine = new LiveSessionEngine(
     { mode, talkType: 'interview', prompt: 'Tell me about your research.', keyterms: ['DiabEvidence', 'claim-checking judge'] },
     {
       now: () => clock,
       autoTick: false,
-      speak,
+      voice,
       createClient: (keyterms, cb) => {
         keytermsSeen = keyterms;
         sttCb = cb;
@@ -57,7 +59,7 @@ function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
   /** Deepgram interim words. */
   const hear = (text: string, fromMs: number, toMs: number) => sttCb.onWords(timed(text, fromMs, toMs), false);
 
-  return { engine, client, speak, saved, advance, say, hear, start: () => engine.start(), keyterms: () => keytermsSeen };
+  return { engine, client, voice, saved, advance, say, hear, start: () => engine.start(), keyterms: () => keytermsSeen };
 }
 
 describe('LiveSessionEngine', () => {
@@ -138,24 +140,63 @@ describe('LiveSessionEngine', () => {
     expect(snap.wpm).toBeNull();
   });
 
-  it('speaks a nudge after five seconds too fast, in coach mode only', async () => {
+  /** Rush for ten seconds: 240 words a minute. */
+  function rush(h: ReturnType<typeof harness>) {
+    h.advance(200, false);
+    for (let i = 0; i < 40; i++) {
+      h.advance(250, true);
+      h.say('quick');
+    }
+  }
+
+  it('never speaks a nudge while you are talking', async () => {
+    const h = harness('coach');
+    await h.start();
+    rush(h);
+    expect(h.engine.getSnapshot().nudge).toBe('fast');
+    expect(h.voice.play).not.toHaveBeenCalled();
+  });
+
+  it('speaks the nudge in the next pause of 600 ms, in coach mode only', async () => {
     for (const mode of ['coach', 'watch'] as const) {
       const h = harness(mode);
       await h.start();
-      h.advance(200, false);
-      for (let i = 0; i < 40; i++) {
-        h.advance(250, true);
-        h.say('quick'); // 240 words a minute
-      }
-      const snap = h.engine.getSnapshot();
-      expect(snap.nudge).toBe('fast');
+      rush(h);
+      h.advance(500, false); // hangover plus a short pause: not yet
+      if (mode === 'coach') expect(h.voice.play).not.toHaveBeenCalled();
+      h.advance(500, false);
       if (mode === 'coach') {
-        expect(h.speak).toHaveBeenCalledWith('Slow down. Let the result land.');
-        expect(h.speak).toHaveBeenCalledTimes(1);
+        expect(h.voice.play).toHaveBeenCalledWith('fast');
+        expect(h.voice.play).toHaveBeenCalledTimes(1);
+        expect(h.engine.getSnapshot().coachSays).toBe('Slow down. Let the result land.');
       } else {
-        expect(h.speak).not.toHaveBeenCalled();
+        expect(h.voice.play).not.toHaveBeenCalled();
       }
     }
+  });
+
+  it('stops the nudge the moment you start talking again', async () => {
+    const h = harness('coach');
+    await h.start();
+    rush(h);
+    h.advance(1000, false);
+    expect(h.voice.isPlaying()).toBe(true);
+    h.advance(100, true);
+    expect(h.voice.stop).toHaveBeenCalled();
+    expect(h.voice.isPlaying()).toBe(false);
+    expect(h.engine.getSnapshot().coachSays).toBeNull();
+  });
+
+  it('skips the nudge if you talk straight through for six seconds', async () => {
+    const h = harness('coach');
+    await h.start();
+    rush(h); // due at about 5 s of rushing
+    for (let i = 0; i < 28; i++) {
+      h.advance(250, true);
+      h.say('quick');
+    }
+    h.advance(1500, false);
+    expect(h.voice.play).not.toHaveBeenCalled();
   });
 
   it('attaches pitch to words once they have finished', async () => {
