@@ -17,8 +17,11 @@ export function Script({ script, className }: { script: string; className?: stri
     <p className={cn('m-0 font-display', className)}>
       {script.split(/(\s*\/\s*)/).map((part, i) =>
         part.trim() === '/' ? (
-          <span key={i} className="mx-1.5 font-sans text-sky" aria-label="pause">
-            /
+          <span key={i}>
+            {' '}
+            <span className="mx-0.5 font-sans text-sky" aria-label="pause">
+              /
+            </span>{' '}
           </span>
         ) : (
           <span key={i}>{part}</span>

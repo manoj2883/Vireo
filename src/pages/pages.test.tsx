@@ -169,6 +169,35 @@ describe('Live session', () => {
   });
 });
 
+describe('Try again', () => {
+  it('keeps the one fix on screen, offers the teleprompter and counts down a pitch', async () => {
+    saveConfig({
+      prompt: 'Pitch your project to an investor.',
+      situationId: 'pitch',
+      talkType: 'pitch',
+      mode: 'watch',
+      audience: false,
+      hideFace: false,
+      retake: { fromSessionId: 's0', oneFix: 'Say the ask in your first ten seconds.', script: 'We help students / find the right office.' },
+    });
+    renderAt('/session');
+    expect(await screen.findByTestId('one-fix-line')).toHaveTextContent('Your fix: Say the ask in your first ten seconds.');
+    expect(screen.getByRole('timer')).toHaveTextContent('1:00 left');
+    expect(screen.queryByTestId('teleprompter')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: 'Teleprompter' }));
+    expect(screen.getByTestId('teleprompter')).toHaveTextContent('We help students / find the right office.');
+  });
+
+  it('shows no fix line, teleprompter or countdown on a first take', async () => {
+    saveConfig({ prompt: 'Tell me about yourself.', situationId: 'interview', talkType: 'interview', mode: 'watch', audience: true, hideFace: false });
+    renderAt('/session');
+    await screen.findByRole('heading', { name: 'Tell me about yourself.' });
+    expect(screen.queryByTestId('one-fix-line')).not.toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Teleprompter' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+  });
+});
+
 describe('Field notes', () => {
   it('writes the notes on first open and shows them beside the transcript', async () => {
     await saveSession(storedSession());
