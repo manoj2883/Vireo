@@ -8,11 +8,11 @@ import type { AudioFrameReading } from '@/audio/pitch/PitchTracker';
 import { VoiceActivityDetector } from './metrics/vad';
 import { TranscriptTimeline } from './metrics/timeline';
 import { PaceMeter, paceState, TALK_TYPES, type PaceState, type PaceZone, type TalkType } from './metrics/pace';
-import { NudgeController, type CoachMode } from './metrics/nudges';
+import { NudgeController, SPOKEN_NUDGES, type CoachMode } from './metrics/nudges';
 import { ghostKey, ghostWpmAt, isBetterTake, summariseTake, type PaceTake } from './metrics/ghost';
 import { DEFAULT_FILLERS, findFillers } from './metrics/fillers';
 import { DeepgramLiveClient, type LiveStatus, type LiveWord, type SttCallbacks } from './deepgramLiveClient';
-import { speakWithBrowser } from './speech';
+import { CoachVoice, type CoachVoiceLike } from './coachVoice';
 
 export interface LiveSessionConfig {
   mode: CoachMode;
@@ -109,8 +109,8 @@ export interface GhostStoreLike {
 export interface EngineDeps {
   startMedia?: (args: MediaStartArgs) => Promise<MediaHandle>;
   createClient?: (keyterms: readonly string[], cb: SttCallbacks, sessionClock: () => number) => LiveClientLike;
-  /** Say a nudge out loud (coach mode). */
-  speak?: (text: string) => void;
+  /** The coach's voice for spoken nudges (coach mode). */
+  voice?: CoachVoiceLike;
   ghostStore?: GhostStoreLike;
   /** Session clock source in ms (performance.now by default). */
   now?: () => number;
@@ -147,6 +147,7 @@ export class LiveSessionEngine {
   private ghost: PaceTake | null = null;
   private trace: (number | null)[] = [];
   private coachSays: { text: string; untilMs: number } | null = null;
+  private coachVoice: CoachVoiceLike | null = null;
   private pitchCache = new Map<number, number[] | undefined>();
   private ended = false;
 
@@ -159,6 +160,13 @@ export class LiveSessionEngine {
     this.timeline = new TranscriptTimeline({ fillers: this.fillers, rushedAboveWpm: this.zone.max, latencyMs: config.transcriptLatencyMs });
     this.nudges = new NudgeController(config.mode);
     this.snapshot = this.compute(0);
+  }
+
+  /** The coach's voice, created on first use and only in coach mode. */
+  private voice(): CoachVoiceLike | null {
+    if (this.config.mode !== 'coach') return null;
+    this.coachVoice ??= this.deps.voice ?? new CoachVoice();
+    return this.coachVoice;
   }
 
   /** Session clock: ms since start(). */
@@ -235,10 +243,18 @@ export class LiveSessionEngine {
     const speaking = this.vad.isSpeaking();
     const state = this.timeline.getWords().length ? paceState(Math.round(wpm), this.zone) : null;
 
-    const nudge = this.nudges.tick(state, speaking, nowMs);
-    if (nudge.speak) {
-      (this.deps.speak ?? speakWithBrowser)(nudge.speak);
-      this.coachSays = { text: nudge.speak, untilMs: nowMs + COACH_BUBBLE_MS };
+    const open = this.vad.getOpenPause(nowMs);
+    const pauseMs = open ? nowMs - open.startMs : 0;
+    const voice = this.voice();
+    // Never talk over the speaker: if they start again mid-nudge, stop at once.
+    if (speaking && voice?.isPlaying()) {
+      voice.stop();
+      this.coachSays = null;
+    }
+    const nudge = this.nudges.tick(state, speaking, nowMs, pauseMs);
+    if (nudge.speak && voice) {
+      voice.play(nudge.speak);
+      this.coachSays = { text: SPOKEN_NUDGES[nudge.speak], untilMs: nowMs + COACH_BUBBLE_MS };
     }
 
     const second = Math.floor(nowMs / 1000);
@@ -314,6 +330,7 @@ export class LiveSessionEngine {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     this.client?.close();
+    this.coachVoice?.stop();
     await this.media?.stop();
     this.status = 'closed';
 
@@ -343,6 +360,7 @@ export class LiveSessionEngine {
     if (this.timer) clearInterval(this.timer);
     this.timer = null;
     this.client?.close();
+    this.coachVoice?.stop();
     await this.media?.stop().catch(() => {});
   }
 

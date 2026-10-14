@@ -38,7 +38,7 @@ export async function grantSttToken(apiKey, fetchImpl = fetch) {
   }
   const body = await res.json().catch(() => ({}));
   if (!res.ok || !body.access_token) {
-    const reason = body.err_msg || body.message || body.error || `HTTP ${res.status}`;
+    const reason = String(body.err_msg || body.message || body.error || `HTTP ${res.status}`).replace(/\.+$/, '');
     const hint = res.status === 401 || res.status === 403 ? ' Check the key, and that it has the Member role or higher.' : '';
     throw new SttTokenError(`Deepgram refused the token request: ${reason}.${hint}`, res.status === 401 || res.status === 403 ? 500 : 502);
   }

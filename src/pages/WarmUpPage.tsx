@@ -102,7 +102,7 @@ export function WarmUpPage() {
               {(
                 [
                   ['watch', 'Watch silently', 'Visual cues only. Best for real calls and recordings.'],
-                  ['coach', 'Coach me out loud', 'A spoken nudge when you drift for more than a few seconds.'],
+                  ['coach', 'Coach me out loud', 'A short spoken nudge in your next pause, never while you’re talking.'],
                 ] as const
               ).map(([value, title, body]) => {
                 const on = config.mode === value;
