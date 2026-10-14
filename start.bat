@@ -22,13 +22,6 @@ if not exist node_modules (
     call npm install
 )
 
-if not exist server\node_modules (
-    echo Installing server dependencies...
-    cd server
-    call npm install
-    cd ..
-)
-
 echo.
 echo [3/3] Launching Backend Server and Frontend App...
 echo - Web UI: http://localhost:5173

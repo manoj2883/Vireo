@@ -13,6 +13,7 @@ import { LiveCaptions } from '@/components/hud/LiveCaptions';
 import { EyeContactDot } from '@/components/hud/EyeContactDot';
 import { Script } from '@/components/notes/TightenedAnswer';
 import { situationById } from '@/session/situations';
+import { sessionCap } from '@/live/sessionCap';
 import { LiveSessionEngine } from '@/live/LiveSessionEngine';
 import { useLiveSnapshot } from '@/live/useLiveSession';
 import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory, newId } from '@/storage/localDb';
@@ -117,6 +118,18 @@ function LiveView({
     navigate(`/notes/${stored.id}`, { replace: true });
   }
 
+  // Sessions stop at ten minutes; the notes are written from what was said.
+  const cap = sessionCap(snap.elapsedMs);
+  const capped = useRef(false);
+  useEffect(() => {
+    if (cap.over && ready && !ending && !capped.current) {
+      capped.current = true;
+      void endSession();
+    }
+    // endSession is recreated each render; the cap only needs to fire once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cap.over, ready, ending]);
+
   return (
     <>
       <header className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-[18px] sm:px-8">
@@ -134,6 +147,11 @@ function LiveView({
           {snap.status === 'connecting' ? ', connecting' : ''}
         </span>
       </header>
+      {cap.warn && (
+        <p role="status" className="m-0 mx-4 mb-3 rounded-md bg-amber-soft px-4 py-2.5 text-[16px] sm:mx-8" data-testid="cap-warning">
+          {Math.ceil(cap.leftMs / 1000)} seconds left. Sessions stop at 10 minutes, and your field notes will be written from what you said.
+        </p>
+      )}
       {config.retake?.oneFix && (
         <p className="m-0 mx-4 -mt-1 mb-3 rounded-md bg-surface-100 px-4 py-2.5 text-[16px] sm:mx-8" data-testid="one-fix-line">
           <span className="font-semibold">Your fix:</span> {config.retake.oneFix}

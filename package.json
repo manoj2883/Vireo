@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "cd server && npm install && cd .. && tsc && vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
     "server": "node server/index.js",
     "start": "concurrently \"npm run server\" \"npm run dev\"",
@@ -19,19 +19,28 @@
     "coach:clips": "node scripts/generate-coach-clips.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.133.0",
+    "@google/genai": "^2.22.0",
     "@mediapipe/tasks-vision": "^1.1.0",
     "@radix-ui/react-slot": "^1.5.0",
     "@radix-ui/react-switch": "^1.4.1",
+    "@upstash/ratelimit": "^2.2.0",
+    "@upstash/redis": "^1.39.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
     "idb": "^8.0.0",
     "jspdf": "^3.0.4",
     "lucide-react": "^0.344.0",
     "motion": "^14.2.0",
+    "openai": "^5.23.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.30.6",
-    "tailwind-merge": "^3.7.0"
+    "tailwind-merge": "^3.7.0",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

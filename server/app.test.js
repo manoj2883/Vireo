@@ -119,13 +119,58 @@ describe('POST /api/stt-token', () => {
     expect((await res.json()).error).toBe('Deepgram refused the token request: Insufficient permissions. Check the key, and that it has the Member role or higher.');
   });
 
-  it('rate-limits one connection to 20 sessions an hour', async () => {
+  it('counts sessions per visitor and hands out an anonymous visitor cookie', async () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ access_token: 't', expires_in: 60 }) });
-    const { base } = await start({ env: { DEEPGRAM_API_KEY: 'dg' }, fetchImpl });
-    const statuses = [];
-    for (let i = 0; i < 21; i++) statuses.push((await fetch(`${base}/api/stt-token`, { method: 'POST' })).status);
-    expect(statuses.slice(0, 20).every((s) => s === 200)).toBe(true);
-    expect(statuses[20]).toBe(429);
+    const { base } = await start({ env: { DEEPGRAM_API_KEY: 'dg', SESSIONS_PER_VISITOR_PER_HOUR: '2' }, fetchImpl });
+    const first = await fetch(`${base}/api/stt-token`, { method: 'POST' });
+    const cookie = first.headers.get('set-cookie').split(';')[0];
+    expect(cookie).toMatch(/^vireo_vid=[0-9a-f-]{36}$/);
+    expect(first.headers.get('set-cookie')).toMatch(/HttpOnly; SameSite=Lax/);
+    const again = (c) => fetch(`${base}/api/stt-token`, { method: 'POST', headers: c ? { cookie: c } : {} });
+    expect((await again(cookie)).status).toBe(200);
+    const third = await again(cookie);
+    expect(third.status).toBe(429);
+    expect(Number(third.headers.get('retry-after'))).toBeGreaterThan(3000);
+    expect((await third.json()).error).toMatch(/a lot of practice for one hour/);
+    // Another visitor isn't affected.
+    expect((await again(null)).status).toBe(200);
+  });
+
+  it('stops every session once the site-wide daily cap is reached', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ access_token: 't', expires_in: 60 }) });
+    const { base } = await start({ env: { DEEPGRAM_API_KEY: 'dg', DAILY_SESSION_CAP: '1' }, fetchImpl });
+    expect((await fetch(`${base}/api/stt-token`, { method: 'POST' })).status).toBe(200);
+    const res = await fetch(`${base}/api/stt-token`, { method: 'POST' });
+    expect(res.status).toBe(429);
+    expect((await res.json()).error).toMatch(/today’s practice limit for everyone/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses sessions if the limit store is down', async () => {
+    const limiter = { backend: 'redis', check: vi.fn().mockRejectedValue(new Error('redis down')) };
+    const { base } = await start({ env: { DEEPGRAM_API_KEY: 'dg' }, limiter });
+    expect((await fetch(`${base}/api/stt-token`, { method: 'POST' })).status).toBe(503);
+  });
+});
+
+describe('write limits', () => {
+  const generate = () => vi.fn().mockResolvedValue({ notes: structuredClone(NOTES), provider: 'fake', model: 'm', attempts: 1 });
+  const send = (base, cookie) =>
+    fetch(`${base}/api/field-notes`, { method: 'POST', headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}) }, body: JSON.stringify({ transcript: TRANSCRIPT }) });
+
+  it('limits field notes and tightening per visitor per hour', async () => {
+    const { base } = await start({ env: { GEMINI_API_KEY: 'k', WRITES_PER_VISITOR_PER_HOUR: '1' }, generate: generate() });
+    const first = await send(base);
+    expect(first.status).toBe(200);
+    const cookie = first.headers.get('set-cookie').split(';')[0];
+    expect((await send(base, cookie)).status).toBe(429);
+  });
+
+  it('also limits by IP, so dropping the cookie doesn’t reset it', async () => {
+    const { base } = await start({ env: { GEMINI_API_KEY: 'k', WRITES_PER_IP_PER_HOUR: '2' }, generate: generate() });
+    expect((await send(base)).status).toBe(200);
+    expect((await send(base)).status).toBe(200);
+    expect((await send(base)).status).toBe(429);
   });
 });
 
