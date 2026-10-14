@@ -7,7 +7,7 @@ import { bestScores } from '@/lib/progress';
 import { Button } from '@/components/ui/button';
 import { Sonogram, type WordSegment } from '@/components/sonogram';
 import { TALK_TYPES } from '@/live/metrics/pace';
-import { requestFieldNotes } from '@/session/fieldNotesApi';
+import { requestFieldNotesWithRetry } from '@/session/fieldNotesApi';
 import { saveConfig, type SessionConfig } from '@/session/config';
 import { deleteSession, getSession, getStory, listSessions, newId, saveStory, updateSession, type StoredSession } from '@/storage/localDb';
 import { ConfirmDelete } from '@/components/ConfirmDelete';
@@ -23,6 +23,8 @@ type Load = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; s
 export function FieldNotesPage() {
   const { id = '' } = useParams();
   const [load, setLoad] = useState<Load>({ status: 'loading' });
+  /** Set while waiting for the automatic second try. */
+  const [retrying, setRetrying] = useState(false);
 
   const refresh = useCallback(async () => {
     const [session, all] = await Promise.all([getSession(id), listSessions()]);
@@ -47,12 +49,13 @@ export function FieldNotesPage() {
         await updateSession(session.id, { notesStatus: 'pending', notesError: undefined });
         await refresh();
         const story = session.config.storyId ? await getStory(session.config.storyId) : undefined;
-        const notes = await requestFieldNotes(session, story);
+        const notes = await requestFieldNotesWithRetry(session, story, () => setRetrying(true));
         await updateSession(session.id, { notesStatus: 'ready', notes });
       } catch (err) {
         await updateSession(session.id, { notesStatus: 'failed', notesError: err instanceof Error ? err.message : String(err) });
       } finally {
         inFlight.delete(session.id);
+        setRetrying(false);
         await refresh();
       }
     },
@@ -79,17 +82,19 @@ export function FieldNotesPage() {
       </div>
     );
   }
-  return <FieldNotesView session={load.session} best={load.best} onRetry={() => write(load.session)} onChange={refresh} />;
+  return <FieldNotesView session={load.session} best={load.best} retrying={retrying} onRetry={() => write(load.session)} onChange={refresh} />;
 }
 
 function FieldNotesView({
   session,
   best,
+  retrying,
   onRetry,
   onChange,
 }: {
   session: StoredSession;
   best: ReturnType<typeof bestScores>;
+  retrying: boolean;
   onRetry: () => void;
   onChange: () => Promise<unknown>;
 }) {
@@ -193,7 +198,7 @@ function FieldNotesView({
             <Scores notes={notes} best={best} session={session} />
           </>
         ) : (
-          <NotesPending session={session} onRetry={onRetry} />
+          <NotesPending session={session} retrying={retrying} onRetry={onRetry} />
         )}
       </section>
 
@@ -280,7 +285,7 @@ function lowerFirst(s: string) {
   return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
 }
 
-function NotesPending({ session, onRetry }: { session: StoredSession; onRetry: () => void }) {
+function NotesPending({ session, retrying, onRetry }: { session: StoredSession; retrying: boolean; onRetry: () => void }) {
   if (session.notesStatus === 'failed') {
     return (
       <div role="alert" className="flex max-w-[760px] flex-col gap-4">
@@ -297,8 +302,12 @@ function NotesPending({ session, onRetry }: { session: StoredSession; onRetry: (
   }
   return (
     <div role="status" className="flex flex-col gap-3">
-      <h1 className="m-0 font-display text-display-l font-normal">Writing your field notes</h1>
-      <p className="m-0 text-body text-ink-muted">Reading your transcript and checking every quote. This takes a few seconds.</p>
+      <h1 className="m-0 font-display text-display-l font-normal">{retrying ? 'Busy, trying again' : 'Writing your notes'}</h1>
+      <p className="m-0 text-body text-ink-muted">
+        {retrying
+          ? 'The note writer is busy right now. Vireo will try again in a few seconds. Your drawing and transcript are already saved on this device.'
+          : 'Reading your transcript and checking every quote. This takes a few seconds.'}
+      </p>
     </div>
   );
 }
