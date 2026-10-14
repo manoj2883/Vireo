@@ -12,7 +12,8 @@ Produce:
 - summary: exactly three sentences.
 - scores (0 to 100): structure (did the answer have a point, an order and a landing), delivery (pace, fillers and pauses, using the metrics given), clarity (concrete, precise, easy to follow).
 - storyMap.sections: the answer's sections in order, each with start and end in ms. When a Story Bank outline is given, map each section to its key point and mark it hit; add a section with null times and status missed for every key point never reached. With no outline, outlinePoint and status are null.
-- notes: two to six, a mix of keep and fix, ordered by time. Titles are short sentences ("You rushed your result."). Bodies are one to three sentences on why it matters and what to try.
+- notes: two to six, a mix of keep and fix, ordered by time. Titles are short sentences ("You rushed your result."). Bodies are one to three sentences on why it matters and what to try. Set cameraEventId to null for notes about speech.
+- Camera notes (only when camera events are given): you may add up to two notes about eye contact, posture, gestures or expression. Each must set cameraEventId to the id of the event it is about, use that event's startMs, and may leave quote empty. Never mention a camera observation that has no event. Describe expression neutrally (smiling, brows lowered); never guess emotions.
 - audienceFollowUp: the one follow-up question a sharp listener would ask next, and the reason you chose it.
 - drills: one to three drills, each specific, repeatable and under ten minutes, aimed at the most important fix.
 
@@ -45,6 +46,14 @@ export function buildFieldNotesPrompt(transcript, context = {}) {
     parts.push('Story Bank outline: none chosen.');
   }
   if (context.metrics) parts.push(`Delivery metrics measured on the device: ${JSON.stringify(context.metrics)}`);
+  if (context.camera?.summary) {
+    const events = (context.camera.events ?? [])
+      .map((e) => `  ${e.id}: ${e.kind} from ${Math.round(e.startMs)} to ${Math.round(e.endMs)} ms (value ${e.value})`)
+      .join('\n');
+    parts.push(`Camera, analysed on the device: ${JSON.stringify(context.camera.summary)}\nCamera events:\n${events || '  (none)'}`);
+  } else {
+    parts.push('Camera: not analysed. Do not write camera notes.');
+  }
 
   return `${parts.join('\n')}
 

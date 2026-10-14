@@ -72,3 +72,35 @@ describe('indexTranscript', () => {
     expect(offsets.map((o) => o.startMs)).toEqual([400, 4300, 7200]);
   });
 });
+
+describe('camera notes', () => {
+  const EVENTS = [
+    { id: 'cam-1', kind: 'look-away', startMs: 5000, endMs: 8200, value: 31 },
+    { id: 'cam-2', kind: 'smile', startMs: 900, endMs: 2400, value: 0.6 },
+  ];
+  const cam = (cameraEventId, startMs = 5100) => ({ kind: 'fix', title: 't', body: 'b', quote: '', cameraEventId, startMs });
+
+  it('keeps a camera note that references a real event, without needing a quote', () => {
+    const { notes, dropped } = verifyNotes([cam('cam-1')], LINES, EVENTS);
+    expect(notes).toEqual([cam('cam-1')]);
+    expect(dropped).toEqual([]);
+  });
+
+  it('drops a camera note whose event does not exist', () => {
+    const { notes, dropped } = verifyNotes([cam('cam-9')], LINES, EVENTS);
+    expect(notes).toEqual([]);
+    expect(dropped).toHaveLength(1);
+  });
+
+  it('drops camera notes when no camera events were sent', () => {
+    expect(verifyNotes([cam('cam-1')], LINES).notes).toEqual([]);
+  });
+
+  it('moves a camera note to its event when its time is off', () => {
+    expect(verifyNotes([cam('cam-2', 60_000)], LINES, EVENTS).notes[0].startMs).toBe(900);
+  });
+
+  it('still requires a quote for a note with no camera event', () => {
+    expect(verifyNotes([{ ...cam(null), quote: '' }], LINES, EVENTS).notes).toEqual([]);
+  });
+});

@@ -68,7 +68,8 @@ export function createApp({ env = process.env, generate = generateTeardown, gran
     try {
       const result = await generate(lines, context ?? {});
       // Evidence check: drop any note whose quote isn't in what the speaker actually said.
-      const { notes, dropped } = verifyNotes(result.notes.notes, lines);
+      const cameraEvents = Array.isArray(context?.camera?.events) ? context.camera.events : [];
+    const { notes, dropped } = verifyNotes(result.notes.notes, lines, cameraEvents);
       if (dropped.length) {
         log.warn(`[field-notes] Dropped ${dropped.length} of ${result.notes.notes.length} notes: quote not found in transcript.`);
       }
