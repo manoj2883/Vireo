@@ -135,4 +135,4 @@ The GIF at the top should show a real live session. Run the app with a Gemini ke
 
 ## License
 
-MIT. Made by Manoj Kumar Gangineni.
+MIT
