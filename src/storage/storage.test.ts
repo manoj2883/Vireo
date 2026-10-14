@@ -13,8 +13,11 @@ import {
   resetLocalDbConnection,
   saveSession,
   saveStory,
+  sessionFromResult,
   type StoredSession,
 } from './localDb';
+import type { LiveSessionResult } from '@/live/LiveSessionEngine';
+import { previousTake, seriesOf } from '@/lib/compare';
 import { LEGACY_DB_NAME } from './legacyDb';
 import { importLegacyStoriesOnce } from './legacyImport';
 
@@ -117,5 +120,27 @@ describe('legacy import', () => {
   it('never creates the old database when there is none', async () => {
     expect(await importLegacyStoriesOnce()).toBe(0);
     expect((await indexedDB.databases()).map((d) => d.name)).not.toContain(LEGACY_DB_NAME);
+  });
+});
+
+describe('takes as a series per prompt', () => {
+  const result = (startedAt: string) => {
+    const s = session('x', startedAt);
+    return { startedAt, segments: s.segments, pauses: [], transcript: s.transcript, metrics: s.metrics, take: { ...s.take, id: 't' }, newBest: false } as unknown as LiveSessionResult;
+  };
+
+  it('stores each retake against the first take and reads the series back in order', async () => {
+    const config = { prompt: 'Tell me about yourself.', talkType: 'interview' as const, mode: 'watch' as const, audience: false, hideFace: false };
+    const first = sessionFromResult(result('2026-10-10T10:00:00.000Z'), config, 's1');
+    const second = sessionFromResult(result('2026-10-11T10:00:00.000Z'), { ...config, retake: { fromSessionId: 's1', oneFix: 'Lead with the result.' } }, 's2');
+    const third = sessionFromResult(result('2026-10-12T10:00:00.000Z'), { ...config, retake: { fromSessionId: 's1', oneFix: 'Pause before it.' } }, 's3');
+    for (const s of [third, first, second]) await saveSession(s);
+
+    const all = await listSessions();
+    expect(first.retakeOf).toBeUndefined();
+    expect((await getSession('s3'))?.retakeOf).toBe('s1');
+    expect(seriesOf(third, all).map((s) => s.id)).toEqual(['s1', 's2', 's3']);
+    expect(previousTake(third, all)?.id).toBe('s2');
+    expect((await getSession('s2'))?.config.retake?.oneFix).toBe('Lead with the result.');
   });
 });

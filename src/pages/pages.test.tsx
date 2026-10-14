@@ -520,3 +520,48 @@ describe('One fix and your answer, tightened', () => {
     expect(alert.parentElement).toHaveTextContent('Try again');
   });
 });
+
+describe('Before and after', () => {
+  const day = (d: number) => new Date(Date.now() - d * 86_400_000).toISOString();
+
+  async function seedPair() {
+    await saveSession(storedSession({ id: 'sess_0', createdAt: day(2), notesStatus: 'ready', notes: { ...NOTES, mainPointMs: 20_000 }, metrics: { ...storedSession().metrics, fillersPerMin: 6, timeInZonePct: 40 } }));
+    await saveSession(
+      storedSession({
+        id: 'sess_1',
+        createdAt: day(1),
+        retakeOf: 'sess_0',
+        config: { ...storedSession().config, retake: { fromSessionId: 'sess_0', oneFix: 'Lead with your result.' } },
+        notesStatus: 'ready',
+        notes: { ...NOTES, mainPointMs: 4000, previousFix: { achieved: true, evidence: 'the answers it refused were the right ones', startMs: 4000 } },
+        tightened: { script: 'x', mainPoint: 'x', status: 'ready' },
+        metrics: { ...storedSession().metrics, fillersPerMin: 2, timeInZonePct: 70 },
+      })
+    );
+  }
+
+  it('shows both sonograms, what changed and whether the fix was achieved', async () => {
+    await seedPair();
+    renderAt('/notes/sess_1');
+    const section = await screen.findByRole('region', { name: 'Before and after' });
+    expect(within(section).getAllByRole('img')).toHaveLength(2);
+    expect(within(section).getByTestId('fix-result')).toHaveTextContent('Your fix: Lead with your result. Yes, you did it.');
+    const changes = within(section).getByRole('list', { name: 'What changed' });
+    expect(changes).toHaveTextContent('Fillers down from 6.0 a minute to 2.0 a minute.');
+    expect(changes).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
+  });
+
+  it('is not shown on a first take', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES, tightened: { script: 'x', mainPoint: 'x', status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    await screen.findByRole('heading', { name: 'Clear story. Rushed ending.' });
+    expect(screen.queryByRole('region', { name: 'Before and after' })).not.toBeInTheDocument();
+  });
+
+  it('puts the best improvement of the week on Home', async () => {
+    await seedPair();
+    renderAt('/app');
+    const week = await screen.findByRole('region', { name: 'Your best improvement this week' });
+    expect(week).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
+  });
+});

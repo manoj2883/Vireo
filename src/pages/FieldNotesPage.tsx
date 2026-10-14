@@ -10,6 +10,8 @@ import { TALK_TYPES } from '@/live/metrics/pace';
 import { requestFieldNotesWithRetry } from '@/session/fieldNotesApi';
 import { requestTightened } from '@/session/tightenApi';
 import { TightenedAnswer } from '@/components/notes/TightenedAnswer';
+import { BeforeAfter } from '@/components/notes/BeforeAfter';
+import { previousTake } from '@/lib/compare';
 import { saveConfig, type SessionConfig } from '@/session/config';
 import { deleteSession, getSession, getStory, listSessions, newId, saveStory, updateSession, type StoredSession } from '@/storage/localDb';
 import { ConfirmDelete } from '@/components/ConfirmDelete';
@@ -20,7 +22,7 @@ const MIN_WORDS = 20;
 const inFlight = new Set<string>();
 const tightenInFlight = new Set<string>();
 
-type Load = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; session: StoredSession; best: ReturnType<typeof bestScores> };
+type Load = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; session: StoredSession; best: ReturnType<typeof bestScores>; previous: StoredSession | null };
 
 /** Field notes (`/notes/:id`): verdict, scores, the whole answer drawn, notes beside the transcript. */
 export function FieldNotesPage() {
@@ -32,7 +34,7 @@ export function FieldNotesPage() {
 
   const refresh = useCallback(async () => {
     const [session, all] = await Promise.all([getSession(id), listSessions()]);
-    setLoad(session ? { status: 'ready', session, best: bestScores(all, id) } : { status: 'missing' });
+    setLoad(session ? { status: 'ready', session, best: bestScores(all, id), previous: previousTake(session, all) } : { status: 'missing' });
     return session;
   }, [id]);
 
@@ -112,6 +114,7 @@ export function FieldNotesPage() {
     <FieldNotesView
       session={load.session}
       best={load.best}
+      previous={load.previous}
       retrying={retrying}
       onRetry={() => write(load.session)}
       tightenPending={tightenPending}
@@ -126,6 +129,7 @@ export function FieldNotesPage() {
 function FieldNotesView({
   session,
   best,
+  previous,
   retrying,
   tightenPending,
   onRetryTighten,
@@ -134,6 +138,7 @@ function FieldNotesView({
 }: {
   session: StoredSession;
   best: ReturnType<typeof bestScores>;
+  previous: StoredSession | null;
   retrying: boolean;
   tightenPending: boolean;
   onRetryTighten: () => void;
@@ -275,6 +280,8 @@ function FieldNotesView({
           <NotesPending session={session} retrying={retrying} onRetry={onRetry} />
         )}
       </section>
+
+      {previous && <BeforeAfter before={previous} after={session} />}
 
       {notes && session.segments.length >= MIN_WORDS && (
         <TightenedAnswer original={session.transcript.map((l) => l.text).join(' ')} tightened={session.tightened} pending={tightenPending} onRetry={onRetryTighten} />
