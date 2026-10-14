@@ -1,12 +1,27 @@
 /**
- * Browser media for a live session: one microphone stream shared by the PCM uplink and the
- * pitch/loudness worklet, the camera at one frame a second, and coach audio playback.
- * Video frames are only sent to the live model; nothing is recorded or stored.
+ * Browser media for a live session: one microphone stream shared by the PCM uplink (to the
+ * transcriber) and the pitch/loudness worklet, plus a camera preview. Video never leaves the
+ * device and nothing is recorded.
  */
-import { AudioRecorder, PCM24Player } from '@/utils/audioProcessor';
-import { VideoProcessor } from '@/utils/videoProcessor';
+import { AudioRecorder } from '@/utils/audioProcessor';
 import { PitchTracker } from '@/audio/pitch/PitchTracker';
 import type { MediaHandle, MediaStartArgs } from './LiveSessionEngine';
+
+async function startCamera(video: HTMLVideoElement | undefined): Promise<MediaStream | null> {
+  if (!video) return null;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+    video.muted = true;
+    video.playsInline = true;
+    await video.play().catch(() => {});
+    return stream;
+  } catch (err) {
+    // A session works without a camera.
+    console.warn('[browserMedia] Camera unavailable:', err);
+    return null;
+  }
+}
 
 export async function startBrowserMedia(args: MediaStartArgs): Promise<MediaHandle> {
   const mic = await navigator.mediaDevices.getUserMedia({
@@ -19,28 +34,18 @@ export async function startBrowserMedia(args: MediaStartArgs): Promise<MediaHand
   const recorder = new AudioRecorder(args.onPcmChunk);
   await recorder.start(mic);
 
-  let video: VideoProcessor | null = new VideoProcessor((base64) => args.onVideoFrame(base64));
-  try {
-    await video.start(args.videoElement);
-  } catch (err) {
-    // A session works without a camera; Vireo just can't see you.
-    console.warn('[browserMedia] Camera unavailable:', err);
-    video = null;
-  }
-
-  const player = new PCM24Player();
+  const camera = await startCamera(args.videoElement);
 
   return {
     pitchAvailable,
     pitchForWord: (startMs, endMs) => tracker.pitchForWord(startMs, endMs),
     micLevel: () => recorder.getAudioLevel(),
-    playCoachAudio: (pcm) => player.playChunk(pcm),
     async stop() {
-      video?.stop();
       recorder.stop();
-      player.stop();
       await tracker.stop();
       mic.getTracks().forEach((t) => t.stop());
+      camera?.getTracks().forEach((t) => t.stop());
+      if (args.videoElement) args.videoElement.srcObject = null;
     },
   };
 }
