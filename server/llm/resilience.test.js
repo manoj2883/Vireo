@@ -10,7 +10,7 @@ const VALID = {
   summary: 'One. Two. Three.',
   scores: { structure: 80, delivery: 70, clarity: 75 },
   storyMap: { sections: [] },
-  notes: [{ kind: 'keep', title: 't', body: 'b', quote: 'say no', startMs: 0 }],
+  notes: [{ kind: 'keep', title: 't', body: 'b', quote: 'say no', cameraEventId: null, startMs: 0 }],
   audienceFollowUp: { question: 'q', reason: 'r' },
   drills: [{ title: 'd', instructions: 'i', minutes: 3 }],
 };

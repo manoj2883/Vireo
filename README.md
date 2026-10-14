@@ -32,7 +32,8 @@ flowchart LR
     Mic --> PCM["16 kHz PCM"]
     PCM --> Uplink["WebSocket to Deepgram<br/>short-lived token"]
     Uplink -->|timed words, interim + final| Timeline["Transcript timeline"]
-    Cam[Camera] --> Preview[Preview only, never uploaded]
+    Cam[Camera] --> Vision["MediaPipe Face + Pose<br/>on device, about 10 fps"]
+    Vision --> Metrics
     VAD --> Timeline
     Timeline --> Metrics["Pace (4 s window) · fillers · nudges · ghost pace"]
     Metrics --> HUD["Live screen<br/>sonogram ribbon, pace band, pause ring"]
@@ -115,7 +116,7 @@ Vireo measures as much as it can on your device, and is explicit about what it s
 
 **Stays on your device**
 
-- **Video is never recorded or stored**, by the browser or the server.
+- **Video is never recorded, stored or uploaded.** Eye contact, posture, gestures and expression are analysed in the browser with MediaPipe; only timed events (like "looked away from 0:41 to 0:45") are kept, on this device.
 - Pauses, pace, fillers, pitch and loudness are computed in the browser.
 - Sessions (transcript, sonogram, metrics, field notes), your Story Bank and ghost pace are stored in this browser's IndexedDB. Nothing is kept on the server.
 
@@ -126,7 +127,7 @@ Vireo measures as much as it can on your device, and is explicit about what it s
 | Microphone audio (16 kHz) | During a live session | **Deepgram**, directly from your browser, for transcription. Your server only issues the short-lived token that opens the connection. |
 | Transcript text and timestamps, your prompt, talk type, pace zone, on-device metrics, and the chosen Story Bank outline | When field notes are written | Your Vireo server, which sends it to the provider in `LLM_PROVIDER`: **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model you choose). |
 
-The camera is used only for the preview on your screen. The server stores nothing and writes no transcript text to its logs, only counts and errors.
+The camera analysis models are downloaded from Google's model storage and jsDelivr when a session starts; no frames are sent anywhere. Field notes receive the camera summary and timed events (not images) so camera notes can cite them. The server stores nothing and writes no transcript text to its logs, only counts and errors.
 
 Each provider handles what it receives under its own terms. Check them for the account and tier you use: some free tiers let the provider use submitted content to improve its products.
 

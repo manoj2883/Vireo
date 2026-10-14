@@ -9,8 +9,10 @@ export const NoteSchema = z.object({
   kind: z.enum(['keep', 'fix']),
   title: z.string().min(1),
   body: z.string().min(1),
-  /** Exact words from the transcript that back the note. */
-  quote: z.string().min(1),
+  /** Exact words from the transcript that back the note. May be empty for a camera note. */
+  quote: z.string(),
+  /** For a note about the camera (eye contact, posture, gestures, expression): the event id it is about. */
+  cameraEventId: z.string().nullable(),
   startMs: ms,
 });
 

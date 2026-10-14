@@ -47,20 +47,31 @@ function findWholeWords(haystack, needle) {
 }
 
 /**
- * Keep only notes whose quote is in the transcript. A kept note whose startMs falls outside
- * the line where its quote begins is moved to that line's start, so "Play this moment" lands
- * on the right words.
+ * Keep only notes backed by evidence. A speech note's quote must be in the transcript; a kept
+ * note whose startMs falls outside the line where its quote begins is moved to that line's start.
+ * A camera note must reference a real camera event id; it is moved to that event if its time is off.
  *
- * @template {{ quote: string, startMs: number }} N
+ * @template {{ quote: string, startMs: number, cameraEventId?: string | null }} N
  * @param {N[]} notes
  * @param {{ speaker?: string, text: string, startMs: number }[]} lines
+ * @param {{ id: string, startMs: number, endMs: number }[]} [cameraEvents]
  * @returns {{ notes: N[], dropped: N[] }}
  */
-export function verifyNotes(notes, lines) {
+export function verifyNotes(notes, lines, cameraEvents = []) {
   const { text, offsets } = indexTranscript(lines);
   const kept = [];
   const dropped = [];
   for (const note of notes) {
+    if (note.cameraEventId) {
+      const event = cameraEvents.find((e) => e.id === note.cameraEventId);
+      if (!event) {
+        dropped.push(note);
+        continue;
+      }
+      const inside = note.startMs >= event.startMs && note.startMs <= event.endMs;
+      kept.push({ ...note, startMs: inside ? note.startMs : Math.round(event.startMs) });
+      continue;
+    }
     const quote = normalizeForQuote(note.quote);
     const at = quote ? findWholeWords(text, quote) : -1;
     if (at === -1) {

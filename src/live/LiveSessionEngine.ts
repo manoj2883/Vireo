@@ -14,6 +14,8 @@ import { DEFAULT_FILLERS, findFillers } from './metrics/fillers';
 import { captionView, likelyFillerBursts, splitParagraphs, type CaptionView } from './metrics/paragraphs';
 import { DeepgramLiveClient, type LiveStatus, type LiveWord, type SttCallbacks } from './deepgramLiveClient';
 import { CoachVoice, type CoachVoiceLike } from './coachVoice';
+import type { Calibration, CameraResult } from '@/vision/cameraTracker';
+import type { VisionHandle } from '@/vision/startVision';
 
 export interface LiveSessionConfig {
   mode: CoachMode;
@@ -25,6 +27,8 @@ export interface LiveSessionConfig {
   transcriptLatencyMs?: number;
   /** Words and phrases the speaker is likely to say, to help recognition. */
   keyterms?: readonly string[];
+  /** Head and eye position from the warm-up's "look at the camera" step. */
+  calibration?: Calibration | null;
 }
 
 export interface LiveSnapshot {
@@ -38,6 +42,8 @@ export interface LiveSnapshot {
   captions: CaptionView;
   /** Short voiced bursts with no transcribed word: likely fillers, not counted. */
   likelyFillers: { startMs: number; endMs: number }[];
+  /** Eye contact from the on-device camera analysis; null without camera feedback. */
+  eyeContact: { looking: boolean; awayMs: number; dim: boolean } | null;
   pauses: PauseSpan[];
   /** Length of the pause in progress, or 0. */
   pausingMs: number;
@@ -85,6 +91,8 @@ export interface LiveSessionResult {
   newBest: boolean;
   /** Likely fillers heard but not transcribed (not counted in metrics). */
   likelyFillers: { startMs: number; endMs: number }[];
+  /** Timed camera events and summary, or null if the camera wasn't analysed. */
+  camera: CameraResult | null;
 }
 
 /** Media plumbing, swappable for tests. */
@@ -118,6 +126,8 @@ export interface EngineDeps {
   createClient?: (keyterms: readonly string[], cb: SttCallbacks, sessionClock: () => number) => LiveClientLike;
   /** The coach's voice for spoken nudges (coach mode). */
   voice?: CoachVoiceLike;
+  /** On-device camera analysis; resolves to null when unavailable. */
+  startVision?: (video: HTMLVideoElement | undefined, clock: () => number, calibration?: Calibration | null) => Promise<VisionHandle | null>;
   ghostStore?: GhostStoreLike;
   /** Session clock source in ms (performance.now by default). */
   now?: () => number;
@@ -155,6 +165,7 @@ export class LiveSessionEngine {
   private coachSays: { text: string; untilMs: number } | null = null;
   /** Times Deepgram marked the end of an utterance: paragraph breaks. */
   private utteranceEnds: number[] = [];
+  private vision: VisionHandle | null = null;
   private coachVoice: CoachVoiceLike | null = null;
   private pitchCache = new Map<number, number[] | undefined>();
   private ended = false;
@@ -214,6 +225,15 @@ export class LiveSessionEngine {
       onAudioFrame: (r) => this.ingestAudioFrame(r),
       onPcmChunk: (pcm) => this.client?.sendAudio(pcm),
     });
+
+    // Camera feedback starts in the background: a slow or failed model load never holds up the session.
+    const startVisionFn = this.deps.startVision ?? (await import('@/vision/startVision')).startVision;
+    void startVisionFn(videoElement, () => this.elapsed(), this.config.calibration)
+      .then((v) => {
+        if (this.ended) v?.stop();
+        else this.vision = v;
+      })
+      .catch(() => {});
 
     await this.client.connect();
     if (this.deps.autoTick !== false) {
@@ -305,6 +325,7 @@ export class LiveSessionEngine {
         { pauses, utteranceEnds: this.utteranceEnds }
       ),
       likelyFillers: likelyFillerBursts(this.vad.getVoicedIntervals(), [...segments, ...this.timeline.interimSegments()], { nowMs }),
+      eyeContact: this.vision ? this.vision.live(nowMs) : null,
       pauses,
       pausingMs: open ? nowMs - open.startMs : 0,
       speaking: this.vad.isSpeaking(),
@@ -345,6 +366,8 @@ export class LiveSessionEngine {
     this.timer = null;
     this.client?.close();
     this.coachVoice?.stop();
+    const camera = this.vision ? this.vision.result(nowMs) : null;
+    this.vision?.stop();
     await this.media?.stop();
     this.status = 'closed';
 
@@ -365,6 +388,7 @@ export class LiveSessionEngine {
       take,
       newBest,
       likelyFillers: this.snapshot.likelyFillers,
+      camera,
     };
   }
 
@@ -376,6 +400,7 @@ export class LiveSessionEngine {
     this.timer = null;
     this.client?.close();
     this.coachVoice?.stop();
+    this.vision?.stop();
     await this.media?.stop().catch(() => {});
   }
 

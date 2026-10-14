@@ -17,8 +17,8 @@ const VALID = {
   scores: { structure: 78, delivery: 64, clarity: 81 },
   storyMap: { sections: [{ title: 'The point', startMs: 400, endMs: 4200, outlinePoint: null, status: null }] },
   notes: [
-    { kind: 'keep', title: 'You led with the point.', body: 'Do it again.', quote: 'teaching AI systems to say no', startMs: 400 },
-    { kind: 'fix', title: 'You rushed your result.', body: 'Pause first.', quote: 'when they do not have the evidence', startMs: 4300 },
+    { kind: 'keep', title: 'You led with the point.', body: 'Do it again.', quote: 'teaching AI systems to say no', cameraEventId: null, startMs: 400 },
+    { kind: 'fix', title: 'You rushed your result.', body: 'Pause first.', quote: 'when they do not have the evidence', cameraEventId: null, startMs: 4300 },
   ],
   audienceFollowUp: { question: 'How do you measure a good refusal?', reason: 'It is the claim they will doubt.' },
   drills: [{ title: 'The full stop', instructions: 'State the result, breathe, explain.', minutes: 4 }],
@@ -117,6 +117,15 @@ describe('prompt', () => {
     expect(prompt).toContain('[00:06 | 6000ms] Coach: Slow down.');
     expect(prompt).toContain('1. The problem');
     expect(prompt).toContain('What they were answering: Tell me about your research.');
+  });
+
+  it('lists camera events by id, or says the camera was not analysed', () => {
+    const prompt = buildFieldNotesPrompt(TRANSCRIPT, {
+      camera: { summary: { eyeContactPct: 70 }, events: [{ id: 'cam-1', kind: 'look-away', startMs: 1000, endMs: 4000, value: 30 }] },
+    });
+    expect(prompt).toContain('cam-1: look-away from 1000 to 4000 ms (value 30)');
+    expect(prompt).toContain('"eyeContactPct":70');
+    expect(buildFieldNotesPrompt(TRANSCRIPT)).toContain('Camera: not analysed. Do not write camera notes.');
   });
 
   it('says when no outline was chosen', () => {

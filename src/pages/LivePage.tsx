@@ -10,6 +10,7 @@ import { PaceBand } from '@/components/hud/PaceBand';
 import { PauseRing } from '@/components/hud/PauseRing';
 import { FillerTicker } from '@/components/hud/FillerTicker';
 import { LiveCaptions } from '@/components/hud/LiveCaptions';
+import { EyeContactDot } from '@/components/hud/EyeContactDot';
 import { LiveSessionEngine } from '@/live/LiveSessionEngine';
 import { useLiveSnapshot } from '@/live/useLiveSession';
 import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory, newId } from '@/storage/localDb';
@@ -42,7 +43,7 @@ function LiveSession({ config }: { config: SessionConfig }) {
       if (cancelled) return;
       const keyterms = buildKeyterms({ prompt: config.prompt, storyTitle: story?.title, keyPoints: story?.keyPoints });
       e = new LiveSessionEngine(
-        { mode: config.mode, talkType: config.talkType, prompt: config.prompt, storyId: config.storyId, keyterms },
+        { mode: config.mode, talkType: config.talkType, prompt: config.prompt, storyId: config.storyId, keyterms, calibration: config.calibration },
         { ghostStore: { get: getGhost, put: putGhost } }
       );
       setEngine(e);
@@ -172,6 +173,8 @@ function LiveView({
               <span className="font-display text-[22px]">{snap.coachSays}</span>
             </div>
           )}
+
+          <EyeContactDot eyeContact={snap.eyeContact} className="absolute left-4 top-4 sm:left-7 sm:top-7" />
 
           <FillerTicker
             className="absolute right-4 top-4 sm:right-7 sm:top-7"

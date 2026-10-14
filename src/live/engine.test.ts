@@ -22,6 +22,11 @@ function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
   let playing = false;
   const voice = { play: vi.fn((kind: string) => void (playing = Boolean(kind))), stop: vi.fn(() => void (playing = false)), isPlaying: () => playing };
   const saved: PaceTake[] = [];
+  const cameraResult = {
+    events: [{ id: 'cam-1', kind: 'look-away' as const, startMs: 1000, endMs: 4000, value: 30 }],
+    summary: { eyeContactPct: 70, longestLookAwayMs: 3000, postureAlerts: 0, gestureRate: 4, smilePct: 10, trackedMs: 10_000 },
+  };
+  const vision = { live: vi.fn(() => ({ looking: false, awayMs: 3500, dim: true })), result: vi.fn(() => cameraResult), stop: vi.fn() };
   const engine = new LiveSessionEngine(
     { mode, talkType: 'interview', prompt: 'Tell me about your research.', keyterms: ['DiabEvidence', 'claim-checking judge'] },
     {
@@ -43,6 +48,7 @@ function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
         };
       },
       ghostStore: { get: async () => ghost, put: async (t) => void saved.push(t) },
+      startVision: async () => vision,
     }
   );
 
@@ -59,7 +65,7 @@ function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
   /** Deepgram interim words. */
   const hear = (text: string, fromMs: number, toMs: number) => sttCb.onWords(timed(text, fromMs, toMs), false);
 
-  return { engine, client, voice, saved, advance, say, hear, start: () => engine.start(), keyterms: () => keytermsSeen };
+  return { engine, client, voice, vision, cameraResult, saved, advance, say, hear, start: () => engine.start(), keyterms: () => keytermsSeen };
 }
 
 describe('LiveSessionEngine', () => {
@@ -100,6 +106,27 @@ describe('LiveSessionEngine', () => {
     const { captions } = h.engine.getSnapshot();
     expect(captions.previous?.map((x) => x.text).join(' ')).toBe('So my research is about');
     expect(captions.current.map((x) => `${x.text}${x.interim ? '*' : ''}`).join(' ')).toBe('teaching systems to say* no*');
+  });
+
+  it('shows eye contact live and saves the camera events with the session', async () => {
+    const h = harness();
+    await h.start();
+    await Promise.resolve();
+    h.advance(200, false);
+    expect(h.engine.getSnapshot().eyeContact).toEqual({ looking: false, awayMs: 3500, dim: true });
+    const result = await h.engine.end();
+    expect(result.camera).toEqual(h.cameraResult);
+    expect(h.vision.stop).toHaveBeenCalled();
+  });
+
+  it('works without camera feedback', async () => {
+    const h = harness();
+    (h.engine as unknown as { deps: { startVision: () => Promise<null> } }).deps.startVision = async () => null;
+    await h.start();
+    await Promise.resolve();
+    h.advance(200, false);
+    expect(h.engine.getSnapshot().eyeContact).toBeNull();
+    expect((await h.engine.end()).camera).toBeNull();
   });
 
   it('passes the keyterms to the transcriber', async () => {

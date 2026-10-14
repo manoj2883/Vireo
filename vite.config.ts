@@ -10,6 +10,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  // Pre-bundle MediaPipe so its first (lazy) use doesn't make the dev server reload the page.
+  optimizeDeps: {
+    include: ['@mediapipe/tasks-vision'],
+  },
   server: {
     port: 5173,
     proxy: {

@@ -19,6 +19,7 @@ export async function requestFieldNotes(session: StoredSession, story?: StoredSt
         paceZone: talk.zone,
         story: story ? { title: story.title, keyPoints: story.keyPoints } : undefined,
         metrics: session.metrics,
+        camera: session.camera ? { summary: session.camera.summary, events: session.camera.events } : undefined,
       },
     }),
   });

@@ -18,6 +18,23 @@ export function WarmUpPage() {
   const [stories, setStories] = useState<StoredStory[]>([]);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { state: preview, levels } = usePreviewMedia(videoRef);
+  const [calibrating, setCalibrating] = useState<'idle' | 'running' | 'done' | 'failed'>(() => (loadConfig()?.calibration ? 'done' : 'idle'));
+
+  /** Two seconds of looking at the camera: where "eye contact" is for you, and your usual posture. */
+  async function calibrateCamera() {
+    const video = videoRef.current;
+    if (!video) return;
+    setCalibrating('running');
+    try {
+      const [{ collect }, { calibrate }] = await Promise.all([import('@/vision/cameraAnalyzer'), import('@/vision/cameraTracker')]);
+      const calibration = calibrate(await collect(video, 2000));
+      setConfig((c) => ({ ...c, calibration }));
+      setCalibrating(calibration ? 'done' : 'failed');
+    } catch {
+      setConfig((c) => ({ ...c, calibration: null }));
+      setCalibrating('failed');
+    }
+  }
   const ids = { prompt: useId(), mode: useId(), audience: useId(), story: useId(), face: useId(), privacy: useId() };
 
   useEffect(() => {
@@ -195,6 +212,22 @@ export function WarmUpPage() {
             <Switch id={ids.face} checked={config.hideFace} onCheckedChange={(v) => set('hideFace', v)} />
           </label>
 
+          <div className="flex flex-col gap-2 rounded-md bg-surface-100 p-[18px]">
+            <span className="text-[16px] font-semibold">Camera feedback</span>
+            <span className="text-[15px] text-ink-muted">
+              Look at the camera for 2 seconds so Vireo knows where eye contact is for you. Analysed on this device only.
+            </span>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <Button variant="outline" size="sm" className="min-h-11" onClick={calibrateCamera} disabled={preview.status !== 'ready' || calibrating === 'running'}>
+                {calibrating === 'running' ? 'Look at the camera…' : calibrating === 'done' ? 'Calibrate again' : 'Look at the camera for 2 seconds'}
+              </Button>
+              <span role="status" className="text-small text-ink-muted">
+                {calibrating === 'done' && 'Calibrated.'}
+                {calibrating === 'failed' && 'Couldn’t see your face clearly. Vireo will use its defaults.'}
+              </span>
+            </div>
+          </div>
+
           <ul className="m-0 flex list-none flex-col gap-2.5 px-1 pt-1 text-[15px]" aria-live="polite">
             {preview.status === 'starting' && <li className="text-ink-muted">Checking your camera and microphone</li>}
             {preview.status === 'error' && (
@@ -225,7 +258,7 @@ export function WarmUpPage() {
           </Button>
           {!canStart && <p className="m-0 text-small text-ink-muted">Write what you’re answering first.</p>}
           <p id={ids.privacy} className="m-0 text-small text-ink-muted">
-            Video is analysed live and never stored. Transcripts and notes stay on this device until you delete them.
+            Video is analysed on this device and never leaves it. Transcripts and notes stay on this device until you delete them.
           </p>
         </aside>
       </div>
