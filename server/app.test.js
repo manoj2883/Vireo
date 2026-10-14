@@ -116,7 +116,7 @@ describe('POST /api/stt-token', () => {
     const fetchImpl = vi.fn().mockResolvedValue({ ok: false, status: 403, json: async () => ({ err_msg: 'Insufficient permissions.' }) });
     const { base } = await start({ env: { DEEPGRAM_API_KEY: 'dg' }, fetchImpl });
     const res = await fetch(`${base}/api/stt-token`, { method: 'POST' });
-    expect((await res.json()).error).toBe('Deepgram refused the token request: Insufficient permissions.. Check the key, and that it has the Member role or higher.');
+    expect((await res.json()).error).toBe('Deepgram refused the token request: Insufficient permissions. Check the key, and that it has the Member role or higher.');
   });
 
   it('rate-limits one connection to 20 sessions an hour', async () => {
