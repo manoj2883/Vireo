@@ -21,7 +21,8 @@ export function createOpenRouterProvider({ apiKey, models, client } = {}) {
   if (list.length === 0) {
     throw new Error('OPENROUTER_MODELS is empty. Set it to one or more model IDs, comma separated, in fallback order.');
   }
-  const openai = client ?? new OpenAI({ apiKey, baseURL: OPENROUTER_BASE_URL });
+  // Retries are handled once, in llm/retry.js, so the SDK's own retries are off.
+  const openai = client ?? new OpenAI({ apiKey, baseURL: OPENROUTER_BASE_URL, maxRetries: 0 });
   return {
     name: 'openrouter',
     model: list[0],

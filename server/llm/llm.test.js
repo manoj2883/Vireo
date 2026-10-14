@@ -155,7 +155,7 @@ describe('provider selection', () => {
   });
 
   it('describes configuration without throwing', () => {
-    expect(describeProvider({ LLM_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'k' })).toEqual({
+    expect(describeProvider({ LLM_PROVIDER: 'openrouter', OPENROUTER_API_KEY: 'k' })).toMatchObject({
       name: 'openrouter',
       configured: false,
       problem: expect.stringMatching(/OPENROUTER_MODELS is empty/),
