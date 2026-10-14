@@ -70,7 +70,6 @@ You need Node.js 20 or newer, a [Deepgram API key](https://console.deepgram.com/
 
 ```bash
 npm install
-cd server && npm install && cd ..
 cp .env.example .env     # then add your keys
 npm run start            # server on :3001, app on http://localhost:5173
 ```
@@ -138,7 +137,11 @@ Each provider handles what it receives under its own terms. Check them for the a
 
 ## Deploying
 
-The `Dockerfile` builds the front end and serves it from the Node server on one port. `render.yaml` is a [Render](https://render.com) blueprint for that image: create a Blueprint from this repo, then add your keys as environment variables in the dashboard. Any host that runs a Docker container with WebSocket support works the same way.
+Vireo deploys to [Vercel](https://vercel.com): the front end is served as static files and `api/index.js` runs the Express API as one serverless function (`vercel.json` routes `/api/*` to it). Set the same keys as `.env.example` in the Vercel project, plus Upstash Redis for usage limits.
+
+Nothing about a visitor is stored on the server: sessions, notes and stories live in their own browser. Each visitor gets an anonymous random cookie used only for usage limits.
+
+**Usage limits** (all optional, defaults shown in `.env.example`): sessions per visitor per hour and per day, sessions per IP per hour, field notes calls per visitor and per IP per hour, and `DAILY_SESSION_CAP`, a site-wide limit on transcription sessions per UTC day. Every live session also stops at 10 minutes. Counters live in [Upstash Redis](https://upstash.com) when `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` (or the Vercel Marketplace `KV_REST_API_URL` and `KV_REST_API_TOKEN`) are set, and in memory otherwise.
 
 ## Recording the demo
 

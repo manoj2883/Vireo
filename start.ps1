@@ -24,13 +24,6 @@ if (-not (Test-Path "node_modules")) {
     npm install
 }
 
-if (-not (Test-Path "server\node_modules")) {
-    Write-Host "[2/3] Installing server dependencies..." -ForegroundColor Yellow
-    Set-Location "server"
-    npm install
-    Set-Location $ScriptDir
-}
-
 Write-Host ""
 Write-Host "[3/3] Launching Full Stack Application..." -ForegroundColor Green
 Write-Host "- Web UI: http://localhost:5173" -ForegroundColor Cyan

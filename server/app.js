@@ -1,10 +1,10 @@
 import express from 'express';
-import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { generateTeardown, generateTightened, describeProvider, TeardownError } from './llm/index.js';
 import { verifyNotes, verifyPreviousFix } from './llm/evidence.js';
 import { grantSttToken, SttTokenError } from './stt.js';
+import { createLimiter, identifyVisitor } from './limits.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -12,35 +12,36 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * The HTTP API: transcription tokens, field notes and health, plus the built front end.
  * `generate` is injectable so the field notes route can be tested without a model.
  */
-export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, grantToken = grantSttToken, fetchImpl = fetch, log = console } = {}) {
-  // Per-connection session limit (in memory; replaced by a shared store for serverless).
-  const ipRequestLogs = new Map();
-  const MAX_SESSIONS_PER_IP_PER_HOUR = 20;
-
-  function isRateLimited(ip) {
-    const now = Date.now();
-    const hourAgo = now - 3600 * 1000;
-    let timestamps = ipRequestLogs.get(ip) || [];
-    timestamps = timestamps.filter((t) => t > hourAgo);
-    if (timestamps.length >= MAX_SESSIONS_PER_IP_PER_HOUR) {
-      return true;
-    }
-    timestamps.push(now);
-    ipRequestLogs.set(ip, timestamps);
-    return false;
+export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, grantToken = grantSttToken, fetchImpl = fetch, log = console, limiter } = {}) {
+  const limits = limiter ?? createLimiter({ env });
+  if (env.VERCEL && limits.backend === 'memory') {
+    log.warn('[limits] Upstash Redis is not configured, so usage limits are per function instance. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
   }
+  const secureCookie = Boolean(env.VERCEL) || env.NODE_ENV === 'production';
+
+  /** Express middleware: count one use of `kind` for this visitor, or answer 429. */
+  const limit = (kind) => async (req, res, next) => {
+    const visitor = identifyVisitor(req, res, { secure: secureCookie });
+    try {
+      const result = await limits.check(kind, visitor);
+      if (result.ok) return next();
+      log.warn(`[limits] ${kind} refused (${result.rule})`);
+      res.set('Retry-After', String(result.retryAfterSec));
+      return res.status(429).json({ error: result.message, retryAfterSec: result.retryAfterSec });
+    } catch (err) {
+      // If the limit store is down, fail closed for sessions (they cost the most), open for the rest.
+      log.error('[limits] check failed:', err.message);
+      if (kind === 'session') return res.status(503).json({ error: 'Vireo can’t start a session right now. Try again in a minute.' });
+      return next();
+    }
+  };
 
   const app = express();
-  app.use(cors());
-  app.use(express.json({ limit: '10mb' }));
+    // A ten-minute transcript is well under this; Vercel caps bodies at 4.5 MB anyway.
+  app.use(express.json({ limit: '2mb' }));
 
   // Short-lived Deepgram token so the browser can open its own transcription socket.
-  app.post('/api/stt-token', async (req, res) => {
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
-    if (isRateLimited(clientIp)) {
-      log.warn(`[stt-token] Rate limit exceeded for ${clientIp}`);
-      return res.status(429).json({ error: 'Too many sessions from this connection. Try again in an hour.' });
-    }
+  app.post('/api/stt-token', limit('session'), async (req, res) => {
     try {
       res.json(await grantToken(env.DEEPGRAM_API_KEY, fetchImpl));
     } catch (err) {
@@ -50,7 +51,7 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
   });
 
   // Field notes endpoint: provider-agnostic teardown (LLM_PROVIDER = gemini | openrouter | anthropic)
-  app.post('/api/field-notes', async (req, res) => {
+  app.post('/api/field-notes', limit('write'), async (req, res) => {
     const { sessionId, transcript, context } = req.body ?? {};
     if (!Array.isArray(transcript)) {
       return res.status(400).json({ error: 'transcript must be an array of { speaker, text, startMs } lines.' });
@@ -91,7 +92,7 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
   });
 
   // "Your answer, tightened": a read-aloud rewrite that only uses the speaker's own words.
-  app.post('/api/tighten', async (req, res) => {
+  app.post('/api/tighten', limit('write'), async (req, res) => {
     const { transcript, context } = req.body ?? {};
     if (!Array.isArray(transcript)) {
       return res.status(400).json({ error: 'transcript must be an array of { speaker, text, startMs } lines.' });
