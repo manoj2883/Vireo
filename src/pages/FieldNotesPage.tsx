@@ -11,6 +11,7 @@ import { requestFieldNotesWithRetry } from '@/session/fieldNotesApi';
 import { requestTightened } from '@/session/tightenApi';
 import { TightenedAnswer } from '@/components/notes/TightenedAnswer';
 import { BeforeAfter } from '@/components/notes/BeforeAfter';
+import { TakeItWithYou } from '@/components/notes/TakeItWithYou';
 import { previousTake } from '@/lib/compare';
 import { saveConfig, type SessionConfig } from '@/session/config';
 import { deleteSession, getSession, getStory, listSessions, newId, saveStory, updateSession, type StoredSession } from '@/storage/localDb';
@@ -367,6 +368,8 @@ function FieldNotesView({
       )}
 
       {notes && notes.drills.length > 0 && <Drills session={session} notes={notes} onChange={onChange} />}
+
+      {notes && <TakeItWithYou session={session} previous={previous} />}
 
       <section aria-label="This session’s data" className="flex flex-wrap items-center justify-between gap-4 border-t border-line pt-8">
         <p className="m-0 max-w-[640px] text-small text-ink-muted">

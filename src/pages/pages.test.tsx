@@ -565,3 +565,31 @@ describe('Before and after', () => {
     expect(week).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
   });
 });
+
+describe('Take it with you', () => {
+  it('offers the report with words off by default, and three reminder days once a date is picked', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES, tightened: { script: 'x', mainPoint: 'x', status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    const section = await screen.findByRole('region', { name: 'Take it with you' });
+    expect(within(section).getByRole('checkbox', { name: /include my words/i })).not.toBeChecked();
+    expect(within(section).getByRole('button', { name: 'Add 3 reminders to my calendar' })).toBeDisabled();
+
+    const inTen = new Date();
+    inTen.setDate(inTen.getDate() + 10);
+    const day = `${inTen.getFullYear()}-${String(inTen.getMonth() + 1).padStart(2, '0')}-${String(inTen.getDate()).padStart(2, '0')}`;
+    fireEvent.change(within(section).getByLabelText(/when is the real interview/i), { target: { value: day } });
+    expect(within(section).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(section).getByRole('button', { name: 'Add 3 reminders to my calendar' })).toBeEnabled();
+  });
+
+  it('explains a date that is too soon', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES, tightened: { script: 'x', mainPoint: 'x', status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    const section = await screen.findByRole('region', { name: 'Take it with you' });
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 1);
+    const day = `${soon.getFullYear()}-${String(soon.getMonth() + 1).padStart(2, '0')}-${String(soon.getDate()).padStart(2, '0')}`;
+    fireEvent.change(within(section).getByLabelText(/when is the real interview/i), { target: { value: day } });
+    expect(within(section).getByRole('alert')).toHaveTextContent(/at least 4 days away/);
+  });
+});
