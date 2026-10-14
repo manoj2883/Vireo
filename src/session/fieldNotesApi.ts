@@ -1,10 +1,12 @@
 import type { FieldNotes } from '@/types/fieldNotes';
 import type { StoredSession, StoredStory } from '@/storage/localDb';
 import { TALK_TYPES } from '@/live/metrics/pace';
+import { situationById } from './situations';
 
 /** Ask the server to write field notes for a stored session. Throws with the server's message. */
 export async function requestFieldNotes(session: StoredSession, story?: StoredStory, fetchImpl: typeof fetch = fetch): Promise<FieldNotes> {
   const talk = TALK_TYPES[session.config.talkType];
+  const situation = situationById(session.config.situationId);
   const res = await fetchImpl('/api/field-notes', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -17,6 +19,7 @@ export async function requestFieldNotes(session: StoredSession, story?: StoredSt
         mode: session.config.mode === 'coach' ? 'Coach me out loud' : 'Watch silently',
         durationMs: session.metrics.durationMs,
         paceZone: talk.zone,
+        situation: situation ? { label: situation.label, criteria: situation.criteria, timeLimitMs: situation.timeLimitMs } : undefined,
         story: story ? { title: story.title, keyPoints: story.keyPoints } : undefined,
         metrics: session.metrics,
         camera: session.camera ? { summary: session.camera.summary, events: session.camera.events } : undefined,

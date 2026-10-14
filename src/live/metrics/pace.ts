@@ -4,6 +4,7 @@ export const TALK_TYPES = {
   pitch: { label: 'Pitch', zone: { min: 140, max: 170 }, focus: 'energy, a clear ask and pace' },
   talk: { label: 'Talk or class', zone: { min: 120, max: 150 }, focus: 'signposting, pauses and pace' },
   toast: { label: 'Toast', zone: { min: 110, max: 140 }, focus: 'warmth, and pauses before the laughs' },
+  english: { label: 'Speaking English with confidence', zone: { min: 110, max: 150 }, focus: 'a steady pace, fewer fillers and complete sentences' },
   free: { label: 'Just practise', zone: { min: 120, max: 160 }, focus: 'pace, fillers and pauses' },
 } as const;
 

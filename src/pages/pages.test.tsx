@@ -95,7 +95,7 @@ describe('routes', () => {
 
   it('/session without a warm-up goes to the warm-up', async () => {
     renderAt('/session');
-    expect(await screen.findByLabelText('What are you answering or presenting?')).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'What are you practising for?' })).toBeInTheDocument();
   });
 
   it('unknown paths show the not-found page', () => {
@@ -105,15 +105,42 @@ describe('routes', () => {
 });
 
 describe('Warm-up', () => {
-  it('sets the pace zone from the kind of talk and starts only with a prompt', async () => {
+  it('starts on a situation card with starter questions, criteria and its pace zone', async () => {
     renderAt('/warm-up');
+    expect(screen.getByRole('radio', { name: /job interview/i })).toBeChecked();
+    expect(screen.getByLabelText('Your question')).toHaveValue('Tell me about yourself.');
+    expect(screen.getByText('Answers the question within the first 20 seconds.')).toBeInTheDocument();
     expect(screen.getByText('130 to 160 wpm')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Toast' }));
-    expect(screen.getByRole('button', { name: 'Toast' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('radio', { name: /toast or big moment/i }));
+    expect(screen.getByLabelText('Your question')).toHaveValue('Give a toast at a friend’s wedding.');
     expect(screen.getByText('110 to 140 wpm')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'Introduce a guest speaker.' }));
+    expect(screen.getByLabelText('Your question')).toHaveValue('Introduce a guest speaker.');
+  });
+
+  it('shows a countdown note for the 60-second pitch', () => {
+    renderAt('/warm-up');
+    fireEvent.click(screen.getByRole('radio', { name: /60-second pitch/i }));
+    expect(screen.getByText(/with a 60-second countdown/)).toBeInTheDocument();
+  });
+
+  it('lets you write your own question, choosing the kind of talk, and starts only with a prompt', () => {
+    renderAt('/warm-up');
+    fireEvent.click(screen.getByRole('radio', { name: /write my own question/i }));
+    const prompt = screen.getByLabelText('What are you answering or presenting?');
+    expect(prompt).toHaveValue('');
     expect(screen.getByRole('button', { name: /start speaking/i })).toBeDisabled();
-    fireEvent.change(screen.getByLabelText('What are you answering or presenting?'), { target: { value: 'A toast for Sam' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Toast' }));
+    expect(screen.getByText('110 to 140 wpm')).toBeInTheDocument();
+    fireEvent.change(prompt, { target: { value: 'A toast for Sam' } });
     expect(screen.getByRole('button', { name: /start speaking/i })).toBeEnabled();
+  });
+
+  it('fills the prompt, situation and drill from a reminder link, with no transcript in it', () => {
+    renderAt('/warm-up?situation=presentation&prompt=Walk%20us%20through%20your%20results.&drill=The%20full%20stop');
+    expect(screen.getByRole('radio', { name: /presentation or class talk/i })).toBeChecked();
+    expect(screen.getByLabelText('Your question')).toHaveValue('Walk us through your results.');
+    expect(screen.getByText(/today’s drill:/i).parentElement).toHaveTextContent('The full stop');
   });
 
   it('explains blocked camera and microphone access', async () => {

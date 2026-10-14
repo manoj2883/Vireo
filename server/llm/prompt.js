@@ -36,6 +36,11 @@ export function buildFieldNotesPrompt(transcript, context = {}) {
   const parts = [];
   if (context.prompt) parts.push(`What they were answering: ${context.prompt}`);
   if (context.talkType) parts.push(`Kind of talk: ${context.talkType}`);
+  if (context.situation?.label) {
+    const criteria = (context.situation.criteria ?? []).map((c) => `  - ${c}`).join('\n');
+    const limit = context.situation.timeLimitMs ? ` Target length: under ${Math.round(context.situation.timeLimitMs / 1000)} seconds.` : '';
+    parts.push(`Situation: ${context.situation.label}.${limit} A good answer here:\n${criteria}\nJudge the answer against these criteria.`);
+  }
   if (context.mode) parts.push(`Session mode: ${context.mode}`);
   if (context.durationMs) parts.push(`Duration: ${clock(context.durationMs)} (${Math.round(context.durationMs)} ms)`);
   if (context.paceZone) parts.push(`Target pace: ${context.paceZone.min} to ${context.paceZone.max} wpm`);
