@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { generateTeardown, getProvider, describeProvider, extractJson, validateReply, TeardownError } from './index.js';
 import { createOpenRouterProvider, parseModelList, OPENROUTER_BASE_URL } from './providers/openrouter.js';
 import { createAnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from './providers/anthropic.js';
-import { buildFieldNotesPrompt } from './prompt.js';
+import { buildFieldNotesPrompt, FIELD_NOTES_SYSTEM } from './prompt.js';
 
 const TRANSCRIPT = [
   { speaker: 'user', text: 'So my research is about teaching AI systems to say no', startMs: 400 },
@@ -15,7 +15,7 @@ const VALID = {
   verdict: 'Clear story. Rushed ending.',
   summary: 'You opened with the point. The middle wandered. The result came too fast.',
   scores: { structure: 78, delivery: 64, clarity: 81 },
-  storyMap: { sections: [{ title: 'The point', startMs: 400, endMs: 4200, outlinePoint: null, status: null }] },
+  storyMap: { sections: [{ title: 'The point', startMs: 400, endMs: 4200, outlinePoint: null, outlineIndex: null, status: null }] },
   notes: [
     { kind: 'keep', title: 'You led with the point.', body: 'Do it again.', quote: 'teaching AI systems to say no', cameraEventId: null, startMs: 400 },
     { kind: 'fix', title: 'You rushed your result.', body: 'Pause first.', quote: 'when they do not have the evidence', cameraEventId: null, startMs: 4300 },
@@ -138,12 +138,25 @@ describe('validation helpers', () => {
     expect(extractJson('Here you go:\n{"a": {"b": 1}}\nThanks')).toBe('{"a": {"b": 1}}');
   });
 
+  it('accepts outlineIndex for each story section, numbered from 1', () => {
+    const ok = { title: 'Thresholds', startMs: 0, endMs: 900, outlinePoint: 'Similarity thresholds failed', outlineIndex: 1, status: 'hit' };
+    expect(validateReply(JSON.stringify({ ...VALID, storyMap: { sections: [ok] } })).data).toBeTruthy();
+    expect(validateReply(JSON.stringify({ ...VALID, storyMap: { sections: [{ ...ok, outlineIndex: 0 }] } })).problem).toMatch(/outlineIndex/);
+  });
+
+  it('tells the model to mark ideas covered in different words as hit, by number', () => {
+    const prompt = buildFieldNotesPrompt(TRANSCRIPT, { story: { title: 't', keyPoints: ['a', 'b'] } });
+    expect(FIELD_NOTES_SYSTEM).toMatch(/outlineIndex to that key point's number/);
+    expect(FIELD_NOTES_SYSTEM).toMatch(/even if the speaker used different words/);
+    expect(prompt).toContain('  1. a\n  2. b');
+  });
+
   it('rejects out-of-range scores', () => {
     expect(validateReply(JSON.stringify({ ...VALID, scores: { ...VALID.scores, delivery: 140 } })).problem).toMatch(/scores\.delivery/);
   });
 
   it('allows null times for missed outline points', () => {
-    const missed = { title: 'The result', startMs: null, endMs: null, outlinePoint: 'The result', status: 'missed' };
+    const missed = { title: 'The result', startMs: null, endMs: null, outlinePoint: 'The result', outlineIndex: null, status: 'missed' };
     expect(validateReply(JSON.stringify({ ...VALID, storyMap: { sections: [missed] } })).data).toBeTruthy();
   });
 });

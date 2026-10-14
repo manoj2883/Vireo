@@ -14,6 +14,8 @@ export interface StorySection {
   startMs: number | null;
   endMs: number | null;
   outlinePoint: string | null;
+  /** The key point's number in the outline (1 = first). Absent in notes written before it existed. */
+  outlineIndex?: number | null;
   status: 'hit' | 'missed' | null;
 }
 
