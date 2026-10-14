@@ -188,8 +188,7 @@ export function HomePage() {
           Your data stays here
         </h2>
         <p className="m-0 max-w-[720px] text-body text-ink-muted">
-          Sessions, transcripts, field notes and your Story Bank are stored in this browser only. Video is analysed live and never stored. During a session, your audio and
-          one camera frame a second go to Google’s Gemini Live to be transcribed; afterwards, your transcript goes to the model your server is set up to use for field notes.
+          Sessions, transcripts, field notes and your Story Bank are stored in this browser only. Video never leaves your device. During a session, your audio goes to Deepgram to be transcribed; afterwards, your transcript goes to the model your server is set up to use for field notes.
         </p>
         <div>
           <ConfirmDelete

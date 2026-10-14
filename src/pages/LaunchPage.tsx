@@ -17,7 +17,7 @@ const FEATURES = [
   { icon: Gauge, tone: 'text-sky', title: 'Ghost pace', body: 'A faint marker shows where you were on your best take, so every rehearsal is a race against yourself.' },
   { icon: PlayCircle, tone: 'text-sky', title: 'Notes on the moment', body: 'Every note is pinned to the second it’s about, with the exact words you said.' },
   { icon: Lock, tone: 'text-amber', title: 'Private by design', body: 'Video is analysed live and never stored. Your sessions stay on your device until you delete them.' },
-  { icon: Cpu, tone: 'text-amber', title: 'Your choice of model', body: 'Gemini Live for real-time coaching, and Gemini, Claude or any OpenRouter model for your notes.' },
+  { icon: Cpu, tone: 'text-amber', title: 'Your choice of model', body: 'Deepgram for live transcription with real word timings, and Gemini, Claude or any OpenRouter model for your notes.' },
 ];
 
 /** Launch page (`/`). */
