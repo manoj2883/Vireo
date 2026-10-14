@@ -9,13 +9,12 @@ import { Sonogram } from '@/components/sonogram';
 import { PaceBand } from '@/components/hud/PaceBand';
 import { PauseRing } from '@/components/hud/PauseRing';
 import { FillerTicker } from '@/components/hud/FillerTicker';
+import { LiveCaptions } from '@/components/hud/LiveCaptions';
 import { LiveSessionEngine } from '@/live/LiveSessionEngine';
 import { useLiveSnapshot } from '@/live/useLiveSession';
 import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory, newId } from '@/storage/localDb';
 import { buildKeyterms } from '@/live/keyterms';
 import { loadConfig, saveConfig, type SessionConfig } from '@/session/config';
-
-const CAPTION_WORDS = 12;
 
 /** Live session (`/session`): camera frame, scrolling sonogram ribbon and glanceable cues. */
 export function LivePage() {
@@ -94,7 +93,6 @@ function LiveView({
 
   const rushing = snap.nudge === 'fast';
   const failed = startError ?? (snap.status === 'failed' ? snap.statusMessage ?? 'The live connection failed.' : null);
-  const captionWords = [...snap.segments.map((w) => ({ ...w, interim: false })), ...snap.interim.map((w) => ({ ...w, interim: true }))].slice(-CAPTION_WORDS);
   const sinceFiller = snap.lastFiller ? snap.elapsedMs - snap.lastFiller.atMs : null;
 
   async function endSession() {
@@ -184,22 +182,15 @@ function LiveView({
 
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-[18px] bg-gradient-to-b from-surface-100/0 via-surface-100/95 to-surface-100 px-4 pb-6 pt-16 sm:px-8 sm:pb-7">
             {captions && (
-              <p className="m-0 max-w-[900px] font-display text-[22px] leading-[30px] sm:text-[26px] sm:leading-[34px]" aria-live="off">
-                {captionWords.length === 0 ? (
-                  <span className="text-ink-muted">{snap.status === 'connected' ? 'Start speaking when you’re ready.' : 'Getting ready'}</span>
-                ) : (
-                  captionWords.map((w, i) => (
-                    <span key={`${w.startMs}-${i}`} className={cn(w.kind === 'filler' && 'italic text-amber', w.interim && 'text-ink-muted')}>
-                      {w.text}{' '}
-                    </span>
-                  ))
-                )}
-              </p>
+              <LiveCaptions
+                captions={snap.captions}
+                placeholder={snap.status === 'connected' ? 'Start speaking when you’re ready.' : 'Getting ready'}
+              />
             )}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-8">
               <div className="flex min-w-0 flex-1 flex-col gap-3.5">
                 <div className="h-[96px] sm:h-[120px]">
-                  <Sonogram mode="scrolling" segments={snap.segments} pauses={snap.pauses} nowMs={snap.elapsedMs} label="Your speech in the last six seconds" />
+                  <Sonogram mode="scrolling" segments={snap.segments} pauses={snap.pauses} tentativeFillers={snap.likelyFillers} nowMs={snap.elapsedMs} label="Your speech in the last six seconds" />
                 </div>
                 <PaceBand wpm={snap.wpm} zone={snap.zone} ghostWpm={snap.ghostWpm} rushing={rushing} />
               </div>

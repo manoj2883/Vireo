@@ -126,6 +126,8 @@ export interface LayoutInput {
   referenceHz?: number;
   /** Mark pauses in the annotation band (hero only). */
   labelPauses?: boolean;
+  /** Likely fillers heard but not transcribed: drawn as faint flat strokes, never labelled. */
+  tentativeFillers?: readonly { startMs: number; endMs: number }[];
 }
 
 export type Point = readonly [number, number];
@@ -139,6 +141,8 @@ export interface Stroke {
   d: string;
   strokeWidth: number;
   opacity: number;
+  /** A likely filler, not a transcribed word. */
+  tentative?: boolean;
 }
 
 export interface WordBox {
@@ -405,6 +409,34 @@ export function layoutSonogram(input: LayoutInput): SonogramLayout {
         d: pathFromPoints(points),
         strokeWidth: spec.strokeWidths[h],
         opacity: HARMONIC_OPACITY[h],
+      });
+    }
+  });
+
+  // Likely fillers: flat, faint strokes in the filler lane, so they read as unconfirmed.
+  (input.tentativeFillers ?? []).forEach((f, i) => {
+    const a = Math.max(f.startMs, win.startMs);
+    const b = Math.min(f.endMs, limitMs);
+    if (b <= a) return;
+    const xa = xAt(a);
+    const xb = Math.max(xa + 1, xAt(b));
+    const y0 = spec.fundamentalY + 1.2 * spec.amp;
+    for (const h of [0, 1, 2] as const) {
+      const y = y0 - spec.harmonicGaps[h];
+      const points: Point[] = [
+        [xa, y],
+        [xb, y],
+      ];
+      strokes.push({
+        key: `t${i}-${h}`,
+        wordIndex: -1,
+        harmonic: h,
+        kind: 'filler',
+        points,
+        d: pathFromPoints(points),
+        strokeWidth: spec.strokeWidths[h],
+        opacity: HARMONIC_OPACITY[h] * 0.4,
+        tentative: true,
       });
     }
   });
