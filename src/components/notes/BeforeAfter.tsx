@@ -1,4 +1,7 @@
-import { Check, X } from 'lucide-react';
+import { useId, useState } from 'react';
+import { Check, Download, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { buildShareCard, saveBlob, shareCardPng } from '@/lib/shareCard';
 import { Sonogram } from '@/components/sonogram';
 import { compareTakes, describeChange } from '@/lib/compare';
 import { cn } from '@/lib/utils';
@@ -7,6 +10,18 @@ import type { StoredSession } from '@/storage/localDb';
 /** Before and after: the previous take and this one, on the same time scale, with what changed. */
 export function BeforeAfter({ before, after }: { before: StoredSession; after: StoredSession }) {
   const { changes, fix } = compareTakes(before, after);
+  const [includeWords, setIncludeWords] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
+  const wordsId = useId();
+
+  async function saveCard() {
+    setCardError(null);
+    try {
+      saveBlob(await shareCardPng(buildShareCard(before, after, { includeWords })), 'vireo-before-and-after.png');
+    } catch (err) {
+      setCardError(err instanceof Error ? err.message : String(err));
+    }
+  }
   // One shared window, so a shorter take really looks shorter.
   const window = { startMs: 0, endMs: Math.max(before.metrics.durationMs, after.metrics.durationMs, 1000) };
   const takes: [string, StoredSession][] = [
@@ -62,6 +77,23 @@ export function BeforeAfter({ before, after }: { before: StoredSession; after: S
           ))}
         </ul>
       )}
+
+      <div className="flex flex-wrap items-center gap-4">
+        <Button variant="outline" size="lg" onClick={saveCard}>
+          <Download className="h-4 w-4" aria-hidden="true" />
+          Save a share card
+        </Button>
+        <label htmlFor={wordsId} className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-label">
+          <input id={wordsId} type="checkbox" className="h-5 w-5 accent-[rgb(var(--olive))]" checked={includeWords} onChange={(e) => setIncludeWords(e.target.checked)} />
+          Include my words
+        </label>
+        <span className="text-small text-ink-muted">A 1080×1350 image, made on this device. Your words stay off it unless you tick the box.</span>
+        {cardError && (
+          <p role="alert" className="m-0 w-full text-small text-amber">
+            {cardError}
+          </p>
+        )}
+      </div>
     </section>
   );
 }
