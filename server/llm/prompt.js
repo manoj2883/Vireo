@@ -8,6 +8,9 @@ Voice: plain, warm and specific. Talk to the speaker as "you". Name what happene
 Evidence is the rule. Every note quotes the exact words the speaker said, copied character for character from the transcript (the words only, without the timestamp or speaker label), and gives the millisecond the quote starts. If you can't back a note with an exact quote, leave the note out. Never quote the coach.
 
 Produce:
+- oneFix: the single most important change, written as an instruction for the next take, e.g. instruction "Give your result a full pause before you say it." and a one-sentence why. Everything else is secondary to this.
+- mainPointMs: the ms when the speaker first stated their main point (the answer to the question), or null if they never did.
+- previousFix: only when a previous fix is given below; otherwise null. achieved is true or false; evidence is an exact quote from this transcript that shows it (or the moment it was missed), with its startMs.
 - verdict: a short headline, under 8 words, naming the strongest and weakest thing, e.g. "Clear story. Rushed ending."
 - summary: exactly three sentences.
 - scores (0 to 100): structure (did the answer have a point, an order and a landing), delivery (pace, fillers and pauses, using the metrics given), clarity (concrete, precise, easy to follow).
@@ -50,6 +53,7 @@ export function buildFieldNotesPrompt(transcript, context = {}) {
   } else {
     parts.push('Story Bank outline: none chosen.');
   }
+  if (context.previousFix) parts.push(`Previous take's one fix (judge whether this take achieved it): ${context.previousFix}`);
   if (context.metrics) parts.push(`Delivery metrics measured on the device: ${JSON.stringify(context.metrics)}`);
   if (context.camera?.summary) {
     const events = (context.camera.events ?? [])

@@ -1,5 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import { fieldNotesJsonSchema } from '../schema.js';
+import { z } from 'zod/v4';
+import { FieldNotesSchema } from '../schema.js';
 
 export const DEFAULT_GEMINI_TEARDOWN_MODEL = 'gemini-3.6-flash';
 
@@ -10,14 +11,14 @@ export function createGeminiProvider({ apiKey, model = DEFAULT_GEMINI_TEARDOWN_M
   return {
     name: 'gemini',
     model,
-    async complete({ system, messages }) {
+    async complete({ system, messages, schema }) {
       const response = await ai.models.generateContent({
         model,
         contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
         config: {
           systemInstruction: system,
           responseMimeType: 'application/json',
-          responseJsonSchema: fieldNotesJsonSchema(),
+          responseJsonSchema: z.toJSONSchema(schema ?? FieldNotesSchema),
         },
       });
       return { text: response.text ?? '' };

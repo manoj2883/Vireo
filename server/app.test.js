@@ -128,3 +128,20 @@ describe('POST /api/stt-token', () => {
     expect(statuses[20]).toBe(429);
   });
 });
+
+describe('POST /api/tighten', () => {
+  it('returns the tightened script from the injected generator', async () => {
+    const tighten = vi.fn().mockResolvedValue({ script: 'Say no. / Then explain.', mainPoint: 'Say no.', provider: 'fake' });
+    const { base } = await start({ tighten });
+    const res = await fetch(`${base}/api/tighten`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ transcript: TRANSCRIPT, context: { oneFix: 'Pause first.' } }) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ script: 'Say no. / Then explain.' });
+    expect(tighten).toHaveBeenCalledWith(expect.any(Array), { prompt: undefined, oneFix: 'Pause first.' });
+  });
+
+  it('needs at least 20 words', async () => {
+    const { base } = await start({ tighten: vi.fn() });
+    const res = await fetch(`${base}/api/tighten`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ transcript: [{ speaker: 'user', text: 'short', startMs: 0 }] }) });
+    expect(res.status).toBe(400);
+  });
+});

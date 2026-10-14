@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { indexTranscript, normalizeForQuote, verifyNotes } from './evidence.js';
+import { indexTranscript, normalizeForQuote, verifyNotes, verifyPreviousFix } from './evidence.js';
 
 const LINES = [
   { speaker: 'user', text: 'So my research is about teaching AI systems to say no', startMs: 400 },
@@ -102,5 +102,18 @@ describe('camera notes', () => {
 
   it('still requires a quote for a note with no camera event', () => {
     expect(verifyNotes([{ ...cam(null), quote: '' }], LINES, EVENTS).notes).toEqual([]);
+  });
+});
+
+describe('previous fix', () => {
+  it('keeps a verdict backed by an exact quote, moved to where the quote is', () => {
+    const fix = { achieved: true, evidence: 'the answers it refused were the right ones', startMs: 0 };
+    expect(verifyPreviousFix(fix, LINES)).toEqual({ ...fix, startMs: 7200 });
+  });
+
+  it('drops a verdict whose evidence is not in the transcript', () => {
+    expect(verifyPreviousFix({ achieved: true, evidence: 'I paused before the result', startMs: 0 }, LINES)).toBeNull();
+    expect(verifyPreviousFix({ achieved: false, evidence: '', startMs: null }, LINES)).toBeNull();
+    expect(verifyPreviousFix(null, LINES)).toBeNull();
   });
 });
