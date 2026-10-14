@@ -9,6 +9,7 @@ import { saveConfig } from '@/session/config';
 import { fieldNotesRetry } from '@/session/fieldNotesApi';
 import { PaceBand } from '@/components/hud/PaceBand';
 import { LiveCaptions } from '@/components/hud/LiveCaptions';
+import { EyeContactDot } from '@/components/hud/EyeContactDot';
 import type { FieldNotes } from '@/types/fieldNotes';
 
 function renderAt(path: string, state?: unknown) {
@@ -367,5 +368,48 @@ describe('LiveCaptions', () => {
   it('shows the placeholder before anything is said', () => {
     render(<LiveCaptions placeholder="Start speaking when you’re ready." captions={{ previous: null, current: [] }} />);
     expect(screen.getByText('Start speaking when you’re ready.')).toBeInTheDocument();
+  });
+});
+
+describe('camera feedback', () => {
+  const camera = {
+    events: [
+      { id: 'cam-1', kind: 'look-away' as const, startMs: 6000, endMs: 9000, value: 30 },
+      { id: 'cam-2', kind: 'smile' as const, startMs: 500, endMs: 2500, value: 0.7 },
+    ],
+    summary: { eyeContactPct: 72, longestLookAwayMs: 3000, postureAlerts: 0, gestureRate: 4, smilePct: 18, trackedMs: 12_000 },
+  };
+
+  it('dims the eye-contact dot after looking away, with a shape change too', () => {
+    const { rerender } = render(<EyeContactDot eyeContact={{ looking: true, dim: false }} />);
+    expect(screen.getByRole('status', { name: 'Eye contact: on' })).not.toHaveAttribute('data-dim');
+    rerender(<EyeContactDot eyeContact={{ looking: false, dim: true }} />);
+    expect(screen.getByRole('status', { name: 'Eye contact: looking away' })).toHaveAttribute('data-dim', 'true');
+  });
+
+  it('shows nothing without camera feedback', () => {
+    const { container } = render(<EyeContactDot eyeContact={null} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it('sends camera events with the field notes request and shows the eye-contact strip', async () => {
+    await saveSession(storedSession({ camera }));
+    const fetchSpy = mockFetch({ ok: true, body: { ...NOTES, notes: [...NOTES.notes, { kind: 'fix', title: 'You looked away at your result.', body: 'Keep your eyes up.', quote: '', cameraEventId: 'cam-1', startMs: 6000 }] } });
+    renderAt('/notes/sess_1');
+    expect(await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' })).toBeInTheDocument();
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.context.camera.events.map((e: { id: string }) => e.id)).toEqual(['cam-1', 'cam-2']);
+    expect(screen.getByTestId('eye-contact-strip').querySelectorAll('[data-away]')).toHaveLength(1);
+    expect(screen.getByText(/eye contact 72% of the time/i)).toBeInTheDocument();
+    const card = screen.getByRole('article', { name: 'You looked away at your result.' });
+    expect(within(card).getByText('Camera')).toBeInTheDocument();
+    expect(within(card).queryByText(/“/)).not.toBeInTheDocument();
+  });
+
+  it('leaves the strip out when the camera was not analysed', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
+    renderAt('/notes/sess_1');
+    await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' });
+    expect(screen.queryByTestId('eye-contact-strip')).not.toBeInTheDocument();
   });
 });

@@ -34,6 +34,11 @@ export interface SonogramProps {
   onRevealComplete?: () => void;
   /** Overrides the generated screen-reader description. An empty string makes it decorative. */
   label?: string;
+  /**
+   * A thin eye-contact strip under the trace (hero only): lit while looking at the camera,
+   * a gap with a dashed underline while looking away.
+   */
+  eyeContactStrip?: { tracked: { startMs: number; endMs: number }; away: readonly { startMs: number; endMs: number }[] };
   /** Likely fillers heard but not transcribed: faint flat strokes. */
   tentativeFillers?: readonly { startMs: number; endMs: number }[];
   /** Field-note pins: a line and dot at each note's moment. The selected one stands taller. */
@@ -81,6 +86,7 @@ export function Sonogram({
   showTimeAxis = false,
   labelPauses = true,
   tentativeFillers,
+  eyeContactStrip,
   className,
 }: SonogramProps) {
   const resolvedVariant: SonogramVariant = variant ?? (mode === 'scrolling' ? 'ribbon' : 'hero');
@@ -264,6 +270,37 @@ export function Sonogram({
             {t.label}
           </text>
         ))}
+
+      {eyeContactStrip && spec.axis && (
+        <g aria-hidden="true" data-testid="eye-contact-strip">
+          <text x={spec.padX - 8} y={spec.axis.baselineY + 56} textAnchor="end" fontSize={12} className="fill-ink-muted font-sans">
+            eyes
+          </text>
+          {(() => {
+            const y = spec.axis.baselineY + 48;
+            const t = eyeContactStrip.tracked;
+            // Split the tracked span into looking (lit) and away (gap) pieces.
+            const away = [...eyeContactStrip.away].sort((a, b) => a.startMs - b.startMs);
+            const lit: { startMs: number; endMs: number }[] = [];
+            let cursor = t.startMs;
+            for (const a of away) {
+              if (a.startMs > cursor) lit.push({ startMs: cursor, endMs: Math.min(a.startMs, t.endMs) });
+              cursor = Math.max(cursor, a.endMs);
+            }
+            if (cursor < t.endMs) lit.push({ startMs: cursor, endMs: t.endMs });
+            return (
+              <>
+                {lit.map((s, i) => (
+                  <rect key={`l${i}`} x={layout.xAt(s.startMs)} y={y} width={Math.max(1, layout.xAt(s.endMs) - layout.xAt(s.startMs))} height={6} rx={3} className="fill-olive" fillOpacity={0.7} />
+                ))}
+                {away.map((s, i) => (
+                  <line key={`a${i}`} x1={layout.xAt(s.startMs)} x2={layout.xAt(s.endMs)} y1={y + 3} y2={y + 3} className="stroke-amber" strokeWidth={1.5} strokeDasharray="3 3" data-away="true" />
+                ))}
+              </>
+            );
+          })()}
+        </g>
+      )}
 
       {pins.length > 0 && spec.axis && (
         <g aria-hidden="true" data-testid="pins">

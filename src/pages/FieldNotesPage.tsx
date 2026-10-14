@@ -214,6 +214,14 @@ function FieldNotesView({
             segments={session.segments}
             pauses={session.pauses}
             tentativeFillers={session.likelyFillers}
+            eyeContactStrip={
+              session.camera
+                ? {
+                    tracked: { startMs: 0, endMs: session.metrics.durationMs },
+                    away: session.camera.events.filter((e) => e.kind === 'look-away' || e.kind === 'out-of-frame'),
+                  }
+                : undefined
+            }
             window={{ startMs: 0, endMs: Math.max(session.metrics.durationMs, 1000) }}
             pins={pins}
             selectedPinLabel={selectedNote?.title}
@@ -223,6 +231,12 @@ function FieldNotesView({
             label={`The whole answer as a sonogram: ${session.segments.length} words, ${session.metrics.fillerCount} fillers, ${session.metrics.pauseCount} pauses.${selectedNote ? ` Pinned: ${selectedNote.title}` : ''}`}
           />
         </div>
+        {session.camera && (
+          <p className="m-0 text-small text-ink-muted">
+            Eye contact {session.camera.summary.eyeContactPct}% of the time, longest look-away {(session.camera.summary.longestLookAwayMs / 1000).toFixed(1)} s, smiling{' '}
+            {session.camera.summary.smilePct}% of the time. The strip under the drawing is lit while you looked at the camera. Analysed on this device; no video was stored.
+          </p>
+        )}
         {(session.likelyFillers?.length ?? 0) > 0 && (
           <p className="m-0 text-small text-ink-muted">
             Faint dashed strokes are sounds Vireo heard but the transcript has no word for, often an “um”. They aren’t counted as fillers.
@@ -444,15 +458,18 @@ function NoteCard({
           <span className={cn('rounded-pill px-3 py-1 text-label', note.kind === 'keep' ? 'bg-paper-olive' : 'bg-paper-amber')}>
             {note.kind === 'keep' ? 'Keep this' : 'Fix next'}
           </span>
+          {note.cameraEventId && <span className="rounded-pill bg-surface-200 px-3 py-1 text-label">Camera</span>}
           <span className="text-small opacity-75">at {clock(note.startMs)}</span>
         </span>
         <span id={titleId} className="font-display text-note-title">
           {note.title}
         </span>
         <span className="text-body">{note.body}</span>
-        <span className="rounded-md bg-surface-200/60 px-4 py-3 text-[16px] leading-[25px] dark:bg-surface-000/10">
-          “<QuoteText quote={note.quote} segments={segments} />”
-        </span>
+        {note.quote && (
+          <span className="rounded-md bg-surface-200/60 px-4 py-3 text-[16px] leading-[25px] dark:bg-surface-000/10">
+            “<QuoteText quote={note.quote} segments={segments} />”
+          </span>
+        )}
       </button>
       <span>
         <Button variant="link" className="h-auto px-0 text-paper-foreground underline" onClick={onPlay}>

@@ -1,5 +1,6 @@
 import type { CoachMode } from '@/live/metrics/nudges';
 import type { TalkType } from '@/live/metrics/pace';
+import type { Calibration } from '@/vision/cameraTracker';
 
 /** Everything the warm-up decides for a session. */
 export interface SessionConfig {
@@ -12,6 +13,8 @@ export interface SessionConfig {
   storyId?: string;
   /** Set when this session answers another session's follow-up question. */
   parentSessionId?: string;
+  /** From the warm-up's "look at the camera" step; null if skipped or unavailable. */
+  calibration?: Calibration | null;
 }
 
 export const DEFAULT_CONFIG: SessionConfig = {

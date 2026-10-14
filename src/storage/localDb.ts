@@ -5,6 +5,7 @@ import type { LiveSessionResult, SessionMetrics, TranscriptLine } from '@/live/L
 import type { PauseSpan, WordSegment } from '@/components/sonogram/types';
 import type { SessionConfig } from '@/session/config';
 import type { FieldNotes } from '@/types/fieldNotes';
+import type { CameraResult } from '@/vision/cameraTracker';
 
 /**
  * On-device storage. Nothing here leaves the device; no video is ever stored.
@@ -31,6 +32,8 @@ export interface StoredSession {
   drillsDone?: string[];
   /** Voiced bursts with no transcribed word: likely fillers, shown lightly, not counted. */
   likelyFillers?: { startMs: number; endMs: number }[];
+  /** On-device camera events and summary (no video is ever stored). */
+  camera?: CameraResult | null;
 }
 
 export type StoryKind = 'story' | 'bit';
@@ -115,6 +118,7 @@ export function sessionFromResult(result: LiveSessionResult, config: SessionConf
     take: { avgWpm: result.take.avgWpm, inZoneRatio: result.take.inZoneRatio, fillersPerMin: result.take.fillersPerMin },
     newBest: result.newBest,
     likelyFillers: result.likelyFillers,
+    camera: result.camera,
     notesStatus: 'pending',
   };
 }
