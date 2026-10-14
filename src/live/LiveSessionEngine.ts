@@ -11,6 +11,7 @@ import { PaceMeter, paceState, TALK_TYPES, type PaceState, type PaceZone, type T
 import { NudgeController, SPOKEN_NUDGES, type CoachMode } from './metrics/nudges';
 import { ghostKey, ghostWpmAt, isBetterTake, summariseTake, type PaceTake } from './metrics/ghost';
 import { DEFAULT_FILLERS, findFillers } from './metrics/fillers';
+import { captionView, likelyFillerBursts, splitParagraphs, type CaptionView } from './metrics/paragraphs';
 import { DeepgramLiveClient, type LiveStatus, type LiveWord, type SttCallbacks } from './deepgramLiveClient';
 import { CoachVoice, type CoachVoiceLike } from './coachVoice';
 
@@ -33,6 +34,10 @@ export interface LiveSnapshot {
   segments: WordSegment[];
   /** Words still being transcribed; shown lighter and replaced when final. */
   interim: WordSegment[];
+  /** The growing paragraph and the one before it, for live captions. */
+  captions: CaptionView;
+  /** Short voiced bursts with no transcribed word: likely fillers, not counted. */
+  likelyFillers: { startMs: number; endMs: number }[];
   pauses: PauseSpan[];
   /** Length of the pause in progress, or 0. */
   pausingMs: number;
@@ -78,6 +83,8 @@ export interface LiveSessionResult {
   metrics: SessionMetrics;
   take: PaceTake;
   newBest: boolean;
+  /** Likely fillers heard but not transcribed (not counted in metrics). */
+  likelyFillers: { startMs: number; endMs: number }[];
 }
 
 /** Media plumbing, swappable for tests. */
@@ -120,7 +127,6 @@ export interface EngineDeps {
 }
 
 const COACH_BUBBLE_MS = 3500;
-const CAPTION_LINE_WORDS = 14;
 
 export class LiveSessionEngine {
   readonly config: LiveSessionConfig;
@@ -147,6 +153,8 @@ export class LiveSessionEngine {
   private ghost: PaceTake | null = null;
   private trace: (number | null)[] = [];
   private coachSays: { text: string; untilMs: number } | null = null;
+  /** Times Deepgram marked the end of an utterance: paragraph breaks. */
+  private utteranceEnds: number[] = [];
   private coachVoice: CoachVoiceLike | null = null;
   private pitchCache = new Map<number, number[] | undefined>();
   private ended = false;
@@ -194,6 +202,7 @@ export class LiveSessionEngine {
           this.publish();
         },
         onWords: (words, isFinal) => this.ingestWords(words, isFinal),
+        onUtteranceEnd: (atMs) => this.utteranceEnds.push(atMs),
       },
       () => this.elapsed()
     );
@@ -291,6 +300,11 @@ export class LiveSessionEngine {
       elapsedMs: nowMs,
       segments,
       interim: this.timeline.interimSegments(),
+      captions: captionView(
+        [...segments.map((w) => ({ ...w, interim: false })), ...this.timeline.interimSegments().map((w) => ({ ...w, interim: true }))],
+        { pauses, utteranceEnds: this.utteranceEnds }
+      ),
+      likelyFillers: likelyFillerBursts(this.vad.getVoicedIntervals(), [...segments, ...this.timeline.interimSegments()], { nowMs }),
       pauses,
       pausingMs: open ? nowMs - open.startMs : 0,
       speaking: this.vad.isSpeaking(),
@@ -346,10 +360,11 @@ export class LiveSessionEngine {
       startedAt: this.startedAt,
       segments,
       pauses,
-      transcript: toTranscriptLines(segments, pauses),
+      transcript: toTranscriptLines(segments, pauses, this.utteranceEnds),
       metrics: summariseMetrics(segments, pauses, this.trace, this.zone, nowMs, this.fillers),
       take,
       newBest,
+      likelyFillers: this.snapshot.likelyFillers,
     };
   }
 
@@ -377,22 +392,16 @@ export function countFillers(segments: readonly WordSegment[], fillers: readonly
   ).length;
 }
 
-/** Group words into transcript lines, breaking at pauses and every few words. */
-export function toTranscriptLines(segments: readonly WordSegment[], pauses: readonly PauseSpan[]): TranscriptLine[] {
-  const lines: TranscriptLine[] = [];
-  let current: WordSegment[] = [];
-  const flush = () => {
-    if (current.length) lines.push({ speaker: 'user', text: current.map((w) => w.text).join(' '), startMs: Math.round(current[0].startMs) });
-    current = [];
-  };
-  segments.forEach((w, i) => {
-    const prev = segments[i - 1];
-    const pauseBetween = prev && pauses.some((p) => p.startMs >= prev.startMs && p.startMs <= w.startMs);
-    if (pauseBetween || current.length >= CAPTION_LINE_WORDS) flush();
-    current.push(w);
-  });
-  flush();
-  return lines;
+/**
+ * Group words into transcript paragraphs, breaking only at pauses of PARAGRAPH_PAUSE_MS or
+ * longer and at Deepgram utterance ends, the same breaks the live captions use.
+ */
+export function toTranscriptLines(segments: readonly WordSegment[], pauses: readonly PauseSpan[], utteranceEnds: readonly number[] = []): TranscriptLine[] {
+  return splitParagraphs(segments, { pauses, utteranceEnds }).map((para) => ({
+    speaker: 'user' as const,
+    text: para.map((w) => w.text).join(' '),
+    startMs: Math.round(para[0].startMs),
+  }));
 }
 
 export function summariseMetrics(

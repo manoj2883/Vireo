@@ -8,6 +8,7 @@ import { getSession, listStories, resetLocalDbConnection, saveSession, saveStory
 import { saveConfig } from '@/session/config';
 import { fieldNotesRetry } from '@/session/fieldNotesApi';
 import { PaceBand } from '@/components/hud/PaceBand';
+import { LiveCaptions } from '@/components/hud/LiveCaptions';
 import type { FieldNotes } from '@/types/fieldNotes';
 
 function renderAt(path: string, state?: unknown) {
@@ -342,5 +343,29 @@ describe('PaceBand', () => {
     render(<PaceBand wpm={null} zone={{ min: 130, max: 160 }} />);
     expect(screen.queryByTestId('pace-dot')).not.toBeInTheDocument();
     expect(screen.getByText('—')).toBeInTheDocument();
+  });
+});
+
+describe('LiveCaptions', () => {
+  const word = (text: string, startMs: number, interim = false, kind: 'speech' | 'filler' = 'speech') => ({ text, startMs, endMs: startMs + 200, kind, interim });
+
+  it('shows the growing paragraph, interim words lighter, and the previous paragraph faded', () => {
+    render(
+      <LiveCaptions
+        placeholder="Start speaking"
+        captions={{ previous: [word('First', 0), word('thought.', 300)], current: [word('Um,', 2000, false, 'filler'), word('second', 2300), word('idea', 2600, true)] }}
+      />
+    );
+    expect(screen.getByTestId('caption-previous')).toHaveTextContent('First thought.');
+    expect(screen.getByTestId('caption-previous').className).toMatch(/opacity-45/);
+    const current = screen.getByTestId('caption-current');
+    expect(current).toHaveTextContent('Um, second idea');
+    expect(within(current).getByText(/idea/)).toHaveAttribute('data-interim', 'true');
+    expect(within(current).getByText(/Um,/)).toHaveClass('italic', 'text-amber');
+  });
+
+  it('shows the placeholder before anything is said', () => {
+    render(<LiveCaptions placeholder="Start speaking when you’re ready." captions={{ previous: null, current: [] }} />);
+    expect(screen.getByText('Start speaking when you’re ready.')).toBeInTheDocument();
   });
 });

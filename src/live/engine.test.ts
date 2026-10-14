@@ -86,6 +86,22 @@ describe('LiveSessionEngine', () => {
     expect(snap.micLevel).toBe(42);
   });
 
+  it('builds live captions as paragraphs that break at long pauses and utterance ends', async () => {
+    const h = harness();
+    await h.start();
+    h.advance(400, false);
+    h.advance(1200, true);
+    h.say('So my research is about', 400, 1600);
+    h.advance(1300, false);
+    h.advance(800, true);
+    h.say('teaching systems to', 2900, 3700);
+    h.hear('say no', 3700, 3900);
+    h.advance(100, true);
+    const { captions } = h.engine.getSnapshot();
+    expect(captions.previous?.map((x) => x.text).join(' ')).toBe('So my research is about');
+    expect(captions.current.map((x) => `${x.text}${x.interim ? '*' : ''}`).join(' ')).toBe('teaching systems to say* no*');
+  });
+
   it('passes the keyterms to the transcriber', async () => {
     const h = harness();
     await h.start();
@@ -226,7 +242,7 @@ describe('LiveSessionEngine', () => {
       h.advance(400, true);
       h.say(i === 3 ? 'um' : 'word', h.engine.elapsed() - 390, h.engine.elapsed() - 20);
     }
-    h.advance(800, false);
+    h.advance(1300, false); // a paragraph break needs a pause of 1.2 s
     h.advance(800, true);
     h.say('after the pause', h.engine.elapsed() - 790, h.engine.elapsed() - 20);
     const result = await h.engine.end();

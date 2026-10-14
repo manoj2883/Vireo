@@ -34,6 +34,8 @@ export interface SonogramProps {
   onRevealComplete?: () => void;
   /** Overrides the generated screen-reader description. An empty string makes it decorative. */
   label?: string;
+  /** Likely fillers heard but not transcribed: faint flat strokes. */
+  tentativeFillers?: readonly { startMs: number; endMs: number }[];
   /** Field-note pins: a line and dot at each note's moment. The selected one stands taller. */
   pins?: readonly SonogramPin[];
   /** Text shown above the selected pin. */
@@ -78,6 +80,7 @@ export function Sonogram({
   showWordLabels = true,
   showTimeAxis = false,
   labelPauses = true,
+  tentativeFillers,
   className,
 }: SonogramProps) {
   const resolvedVariant: SonogramVariant = variant ?? (mode === 'scrolling' ? 'ribbon' : 'hero');
@@ -104,8 +107,9 @@ export function Sonogram({
         nowMs: scrolling ? nowMs : undefined,
         minPxPerSecond: scrolling ? undefined : minPxPerSecond,
         labelPauses,
+        tentativeFillers,
       }),
-    [segments, pauses, annotations, resolvedVariant, layoutWindow, scrolling, nowMs, minPxPerSecond, labelPauses]
+    [segments, pauses, annotations, resolvedVariant, layoutWindow, scrolling, nowMs, minPxPerSecond, labelPauses, tentativeFillers]
   );
 
   const { width, height, spec } = layout;
@@ -210,6 +214,8 @@ export function Sonogram({
             vectorEffect={nonScaling}
             data-kind={s.kind}
             data-harmonic={s.harmonic}
+            data-tentative={s.tentative || undefined}
+            strokeDasharray={s.tentative ? '3 3' : undefined}
           />
         ))}
         {showWordLabels && layout.labels.map((l) => (

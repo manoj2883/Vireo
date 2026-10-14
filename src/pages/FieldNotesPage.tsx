@@ -213,6 +213,7 @@ function FieldNotesView({
           <Sonogram
             segments={session.segments}
             pauses={session.pauses}
+            tentativeFillers={session.likelyFillers}
             window={{ startMs: 0, endMs: Math.max(session.metrics.durationMs, 1000) }}
             pins={pins}
             selectedPinLabel={selectedNote?.title}
@@ -222,6 +223,11 @@ function FieldNotesView({
             label={`The whole answer as a sonogram: ${session.segments.length} words, ${session.metrics.fillerCount} fillers, ${session.metrics.pauseCount} pauses.${selectedNote ? ` Pinned: ${selectedNote.title}` : ''}`}
           />
         </div>
+        {(session.likelyFillers?.length ?? 0) > 0 && (
+          <p className="m-0 text-small text-ink-muted">
+            Faint dashed strokes are sounds Vireo heard but the transcript has no word for, often an “um”. They aren’t counted as fillers.
+          </p>
+        )}
       </section>
 
       {notes && notes.storyMap.sections.length > 0 && <StoryMap notes={notes} durationMs={session.metrics.durationMs} hasOutline={Boolean(session.config.storyId)} />}

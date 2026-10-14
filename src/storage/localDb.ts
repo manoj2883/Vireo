@@ -29,6 +29,8 @@ export interface StoredSession {
   notesError?: string;
   /** Drill titles ticked off on the field notes page. */
   drillsDone?: string[];
+  /** Voiced bursts with no transcribed word: likely fillers, shown lightly, not counted. */
+  likelyFillers?: { startMs: number; endMs: number }[];
 }
 
 export type StoryKind = 'story' | 'bit';
@@ -112,6 +114,7 @@ export function sessionFromResult(result: LiveSessionResult, config: SessionConf
     metrics: result.metrics,
     take: { avgWpm: result.take.avgWpm, inZoneRatio: result.take.inZoneRatio, fillersPerMin: result.take.fillersPerMin },
     newBest: result.newBest,
+    likelyFillers: result.likelyFillers,
     notesStatus: 'pending',
   };
 }
