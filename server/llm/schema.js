@@ -23,6 +23,8 @@ export const StorySectionSchema = z.object({
   endMs: ms.nullable(),
   /** The Story Bank key point this section maps to, when an outline was chosen. */
   outlinePoint: z.string().nullable(),
+  /** That key point's number in the outline (1 = first), or null. Matching uses this, not the text. */
+  outlineIndex: z.number().int().min(1).nullable(),
   /** hit or missed against the outline; null when no outline was chosen. */
   status: z.enum(['hit', 'missed']).nullable(),
 });
