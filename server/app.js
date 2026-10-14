@@ -1,21 +1,19 @@
 import express from 'express';
 import cors from 'cors';
-import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { generateTeardown, describeProvider, TeardownError } from './llm/index.js';
 import { verifyNotes } from './llm/evidence.js';
+import { grantSttToken, SttTokenError } from './stt.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /**
- * The HTTP API: session tokens, field notes and health, plus the built front end.
+ * The HTTP API: transcription tokens, field notes and health, plus the built front end.
  * `generate` is injectable so the field notes route can be tested without a model.
  */
-export function createApp({ env = process.env, generate = generateTeardown, log = console } = {}) {
-  const GEMINI_API_KEY = env.GEMINI_API_KEY;
-  // Session Tokens & IP Rate Limiting
-  const validSessionTokens = new Set();
+export function createApp({ env = process.env, generate = generateTeardown, grantToken = grantSttToken, fetchImpl = fetch, log = console } = {}) {
+  // Per-connection session limit (in memory; replaced by a shared store for serverless).
   const ipRequestLogs = new Map();
   const MAX_SESSIONS_PER_IP_PER_HOUR = 20;
 
@@ -36,46 +34,19 @@ export function createApp({ env = process.env, generate = generateTeardown, log 
   app.use(cors());
   app.use(express.json({ limit: '10mb' }));
 
-  // Session Token Endpoint
-  app.post('/api/session-token', (req, res) => {
+  // Short-lived Deepgram token so the browser can open its own transcription socket.
+  app.post('/api/stt-token', async (req, res) => {
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown';
     if (isRateLimited(clientIp)) {
-      log.warn(`[Server Auth] Rate limit exceeded for IP: ${clientIp}`);
-      return res.status(429).json({
-        error: 'Too many session requests. Maximum 20 sessions per hour permitted.'
-      });
+      log.warn(`[stt-token] Rate limit exceeded for ${clientIp}`);
+      return res.status(429).json({ error: 'Too many sessions from this connection. Try again in an hour.' });
     }
-
-    const apiKeyPresent = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '');
-    if (!apiKeyPresent) {
-      return res.status(500).json({
-        error: 'GEMINI_API_KEY is not configured on the server. Please set it in environment variables.'
-      });
+    try {
+      res.json(await grantToken(env.DEEPGRAM_API_KEY, fetchImpl));
+    } catch (err) {
+      log.error('[stt-token]', err.message);
+      res.status(err instanceof SttTokenError ? err.status : 500).json({ error: err.message });
     }
-
-    const sessionToken = 'st_session_' + crypto.randomBytes(16).toString('hex');
-    validSessionTokens.add(sessionToken);
-
-    setTimeout(() => {
-      validSessionTokens.delete(sessionToken);
-    }, 3600 * 1000);
-
-    res.json({
-      sessionToken,
-      expiresIn: 3600,
-      serverTime: new Date().toISOString()
-    });
-  });
-
-  // Backward compatibility route for /api/token
-  app.post('/api/token', (req, res) => {
-    const apiKeyPresent = Boolean(GEMINI_API_KEY && GEMINI_API_KEY.trim() !== '');
-    if (!apiKeyPresent) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY is not configured' });
-    }
-    const sessionToken = 'st_session_' + crypto.randomBytes(16).toString('hex');
-    validSessionTokens.add(sessionToken);
-    res.json({ token: sessionToken, sessionToken, expiresIn: 3600 });
   });
 
   // Field notes endpoint: provider-agnostic teardown (LLM_PROVIDER = gemini | openrouter | anthropic)
@@ -121,7 +92,7 @@ export function createApp({ env = process.env, generate = generateTeardown, log 
   app.get('/api/health', (req, res) => {
     res.json({
       status: 'ok',
-      hasApiKey: Boolean(GEMINI_API_KEY && GEMINI_API_KEY.trim() !== ''),
+      transcription: { provider: 'deepgram', configured: Boolean(env.DEEPGRAM_API_KEY && env.DEEPGRAM_API_KEY.trim()) },
       fieldNotes: describeProvider(env),
       timestamp: new Date().toISOString()
     });
@@ -143,5 +114,5 @@ export function createApp({ env = process.env, generate = generateTeardown, log 
     });
   });
 
-  return { app, validSessionTokens };
+  return { app };
 }
