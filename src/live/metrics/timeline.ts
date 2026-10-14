@@ -16,7 +16,13 @@ export interface TimedWord {
   endMs: number;
   /** Pace when the word arrived, used to mark rushed passages. */
   wpmAtArrival: number | null;
+  /** A filler the transcriber showed in an interim result but dropped from the final. */
+  rescued?: boolean;
 }
+
+/** Filler tokens Deepgram emits with filler_words=true. */
+const FILLER_TOKENS = new Set(['um', 'uh', 'umm', 'uhh', 'erm', 'hmm', 'mhmm', 'mm', 'uh-huh']);
+const isFillerToken = (text: string) => FILLER_TOKENS.has(text.toLowerCase().replace(/[^a-z-]/g, ''));
 
 export interface TimelineOptions {
   fillers?: readonly string[];
@@ -81,6 +87,8 @@ export class TranscriptTimeline {
   private words: TimedWord[] = [];
   /** Words still being transcribed: shown, then replaced when the final arrives. */
   private interim: TimedWord[] = [];
+  /** Fillers seen in interim results, kept in case the final drops them. */
+  private interimFillers = new Map<number, TimedWord>();
   /** Webspeech-style utterances: id -> index of its first word and its word count. */
   private utterances = new Map<string, { first: number; count: number }>();
   private readonly fillers: readonly string[];
@@ -115,16 +123,45 @@ export class TranscriptTimeline {
    * already in the timeline are skipped, so a repeated final can't double up.
    */
   appendTimed(words: readonly { text: string; startMs: number; endMs: number }[], wpm: number | null = null): void {
+    words = this.withRescuedFillers(words);
     for (const w of words) {
       if (!w.text || !Number.isFinite(w.startMs) || !Number.isFinite(w.endMs)) continue;
       if (this.words.length && w.startMs < this.lastEndMs - 20) continue;
-      this.words.push({ text: w.text, startMs: w.startMs, endMs: Math.max(w.endMs, w.startMs + 1), wpmAtArrival: wpm });
+      this.words.push({
+        text: w.text,
+        startMs: w.startMs,
+        endMs: Math.max(w.endMs, w.startMs + 1),
+        wpmAtArrival: wpm,
+        ...('rescued' in w && w.rescued ? { rescued: true } : {}),
+      });
     }
+  }
+
+  /**
+   * Deepgram usually keeps "um"/"uh" in finals, but sometimes shows them in an interim result
+   * and drops them from the final. Put back any interim filler inside this final's span that no
+   * final word covers.
+   */
+  private withRescuedFillers(finals: readonly { text: string; startMs: number; endMs: number }[]) {
+    if (!finals.length || !this.interimFillers.size) return finals;
+    const from = finals[0].startMs - 150;
+    const to = finals[finals.length - 1].endMs + 150;
+    const rescued: (TimedWord & { rescued: true })[] = [];
+    for (const [key, f] of this.interimFillers) {
+      if (f.endMs < from || f.startMs > to) continue;
+      this.interimFillers.delete(key);
+      const covered = finals.some((w) => w.startMs < f.endMs - 20 && w.endMs > f.startMs + 20);
+      if (!covered) rescued.push({ ...f, rescued: true });
+    }
+    return rescued.length ? [...finals, ...rescued].sort((a, b) => a.startMs - b.startMs) : finals;
   }
 
   /** Replace the in-progress (interim) words. */
   setInterim(words: readonly { text: string; startMs: number; endMs: number }[]): void {
     this.interim = words.filter((w) => w.text).map((w) => ({ ...w, wpmAtArrival: null }));
+    for (const w of this.interim) {
+      if (isFillerToken(w.text)) this.interimFillers.set(Math.round(w.startMs / 50), w);
+    }
   }
 
   /** In-progress words as segments, with fillers marked. Never counted in metrics. */
