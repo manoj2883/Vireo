@@ -15,7 +15,7 @@
 ## What it does
 
 - **Live cues you can glance at.** A pace dot drifts through your target zone and grows a ring when you rush. A ring fills while you hold a pause. Fillers leave small triangle marks that fade. Your speech scrolls past as a sonogram ribbon.
-- **Two coaching modes.** *Watch silently* shows visual cues only. *Coach me out loud* adds a short spoken nudge, but only after your pace has been out of the zone for more than five seconds.
+- **Two coaching modes.** *Watch silently* shows visual cues only. *Coach me out loud* adds a short spoken nudge after your pace has been out of the zone for five seconds, and only in your next pause: it never talks over you, stops the moment you speak, and skips the nudge if no pause comes.
 - **Field notes, backed by evidence.** After each session you get a verdict, structure, delivery and clarity scores compared with your best, the whole answer drawn with notes pinned to it, a story map, keep and fix notes beside the transcript, and drills. The server checks every quote against your transcript and drops any note it can't back up.
 - **Audience mode.** Vireo asks the follow-up a sharp listener would ask, and *Answer it now* starts a short session on it.
 - **Story Bank.** Keep the stories you tell often, with their key points. Rehearse one and Vireo checks which points you hit.
@@ -87,6 +87,16 @@ Live transcription uses Deepgram (`DEEPGRAM_API_KEY`). Field notes can come from
 | `openrouter` | `OPENROUTER_API_KEY`, `OPENROUTER_MODELS` | Comma-separated model IDs in fallback order, sent as OpenRouter's `models` array. Free models rotate and get rate-limited, so list several. Nothing is hardcoded. |
 
 `GET /api/health` reports whether the live key and the field notes provider are configured.
+
+### Coach voice
+
+Spoken nudges are short pre-recorded clips in `public/coach/`, so they play instantly and no model is called during a session. Generate them once with Deepgram text-to-speech:
+
+```bash
+npm run coach:clips        # uses DEEPGRAM_API_KEY; --voice aura-2-andromeda-en to change voice
+```
+
+Without the clips, the browser's own English voice says the same lines.
 
 ### Checks
 
