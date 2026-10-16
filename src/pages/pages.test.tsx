@@ -90,6 +90,28 @@ describe('routes', () => {
     expect(screen.getByRole('link', { name: 'Try a session' })).toHaveAttribute('href', '/warm-up');
   });
 
+  it('says the demo is resting and won’t start a session when the server has no keys', async () => {
+    mockFetch({ ok: true, body: { status: 'ok', transcription: { provider: 'deepgram', configured: false }, fieldNotes: { name: 'gemini', configured: false } } });
+    const { unmount } = renderAt('/');
+    expect(await screen.findByText(/the public demo is resting\. run vireo locally in a few minutes\./i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'See local setup' })).toHaveAttribute('href', 'https://github.com/manoj2883/Vireo#local-setup');
+    expect(screen.getByRole('button', { name: 'Try a session' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Try a session' })).toBeNull();
+    unmount();
+
+    renderAt('/warm-up');
+    await screen.findByText(/the public demo is resting/i);
+    expect(screen.getByRole('button', { name: /start speaking/i })).toBeDisabled();
+  });
+
+  it('shows no banner when the server has both keys', async () => {
+    const spy = mockFetch({ ok: true, body: { transcription: { configured: true }, fieldNotes: { configured: true } } });
+    renderAt('/');
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('/api/health'));
+    expect(screen.queryByText(/the public demo is resting/i)).toBeNull();
+    expect(screen.getByRole('link', { name: 'Try a session' })).toHaveAttribute('href', '/warm-up');
+  });
+
   it('/app welcomes a first-time speaker inside the app shell', async () => {
     renderAt('/app');
     expect(await screen.findByRole('heading', { level: 1, name: 'Your first session starts here.' })).toBeInTheDocument();

@@ -179,9 +179,11 @@ Vireo deploys to [Vercel](https://vercel.com). The front end is served as static
 1. Import the GitHub repo in Vercel. The build command and output come from `package.json` and `vercel.json`.
 2. In the project's **Environment Variables**, add the same keys as `.env.example`: at least `DEEPGRAM_API_KEY` and one field notes provider.
 3. For usage limits shared across serverless instances, add the **Upstash** integration from the Vercel Marketplace (it sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`) or set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
-4. Deploy, then open `/api/health` on the live URL to check both keys are seen.
+4. Deploy, then open `/api/health` on the live URL to check both keys are seen. If either is missing, the launch and warm-up pages say the demo is resting and won't start a session.
 
 **Usage limits** (all optional, defaults in `.env.example`): sessions per visitor per hour and per day, sessions per IP per hour, field notes calls per visitor and per IP per hour, and `DAILY_SESSION_CAP`, a site-wide limit on transcription sessions per UTC day. Every live session also stops at 10 minutes. Without Upstash, counters are kept in memory, which is fine for one local server.
+
+For a public launch, set `DAILY_SESSION_CAP=50` (the code default is 300) and raise it once you've seen real usage. Also set a spending limit (or at least a usage alert) in your Deepgram console, so a traffic spike can’t run up a bill unnoticed.
 
 ## Recording the demo
 

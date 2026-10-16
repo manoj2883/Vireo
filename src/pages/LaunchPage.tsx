@@ -8,6 +8,8 @@ import { HeroSonogram } from '@/components/sonogram/HeroSonogram';
 import { PaceBand } from '@/components/hud/PaceBand';
 import { PauseRing } from '@/components/hud/PauseRing';
 import { FillerTicker } from '@/components/hud/FillerTicker';
+import { DemoResting } from '@/components/DemoResting';
+import { useDemoHealth } from '@/lib/health';
 
 const REPO_URL = 'https://github.com/manoj2883/Vireo';
 
@@ -22,6 +24,7 @@ const FEATURES = [
 
 /** Launch page (`/`). */
 export function LaunchPage() {
+  const resting = useDemoHealth() === 'resting';
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex max-w-container items-center justify-between gap-4 px-4 py-5 sm:px-8">
@@ -39,6 +42,7 @@ export function LaunchPage() {
 
       <main className="mx-auto flex max-w-container flex-col gap-24 px-4 pb-16 pt-12 sm:px-8 sm:pt-20">
         <section className="flex flex-col gap-10">
+          {resting && <DemoResting className="max-w-[760px]" />}
           <motion.h1
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
@@ -52,9 +56,15 @@ export function LaunchPage() {
               Vireo is a real-time speech coach. It listens while you practise, shows pace, fillers and pauses at a glance, and backs every note with the exact words you said.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button asChild size="lg">
-                <Link to="/warm-up">Try a session</Link>
-              </Button>
+              {resting ? (
+                <Button size="lg" disabled>
+                  Try a session
+                </Button>
+              ) : (
+                <Button asChild size="lg">
+                  <Link to="/warm-up">Try a session</Link>
+                </Button>
+              )}
               <Button asChild size="lg" variant="outline">
                 <a href={REPO_URL}>View the code</a>
               </Button>
