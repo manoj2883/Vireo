@@ -194,4 +194,4 @@ Then remove the `<!--` and `-->` around each image line at the top.
 
 ## Licence
 
-MIT
+[MIT](LICENSE)
