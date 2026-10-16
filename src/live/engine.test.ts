@@ -186,7 +186,7 @@ describe('LiveSessionEngine', () => {
   /** Rush for ten seconds: 240 words a minute. */
   function rush(h: ReturnType<typeof harness>) {
     h.advance(200, false);
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 60; i++) { // 15 s: past the 10 s a spoken nudge needs
       h.advance(250, true);
       h.say('quick');
     }
@@ -233,7 +233,7 @@ describe('LiveSessionEngine', () => {
   it('skips the nudge if you talk straight through for six seconds', async () => {
     const h = harness('coach');
     await h.start();
-    rush(h); // due at about 5 s of rushing
+    rush(h); // due at about 10 s of rushing
     for (let i = 0; i < 28; i++) {
       h.advance(250, true);
       h.say('quick');

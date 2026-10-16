@@ -24,23 +24,66 @@ export function paceState(wpm: number | null, zone: PaceZone): PaceState | null 
   return 'in';
 }
 
+/** Window for the visual pace dot only: short, so the dot reacts while you speak. */
 export const PACE_WINDOW_MS = 4000;
+
+/** Window for every nudge decision: long enough (~30 words) that one pause or burst can't flip it. */
+export const NUDGE_PACE_WINDOW_MS = 12_000;
+
+/** Silences longer than this are left out of pace (articulation rate); the pause ring coaches them. */
+export const PAUSE_EXCLUDE_MS = 700;
+
+/** How far past a zone edge pace must go to count as out, so it doesn't flicker at the edge. */
+export const HYSTERESIS_WPM = 10;
 
 /** Shortest span pace is measured over, so the first word can't read as a spike. */
 export const MIN_PACE_SPAN_MS = 1000;
 
+export interface Span {
+  startMs: number;
+  endMs: number;
+}
+
+/** Silences between consecutive words that are long enough to leave out of pace. */
+export function longPauses(words: readonly Span[], minMs = PAUSE_EXCLUDE_MS): Span[] {
+  const out: Span[] = [];
+  for (let i = 1; i < words.length; i++) {
+    const gap = { startMs: words[i - 1].endMs, endMs: words[i].startMs };
+    if (gap.endMs - gap.startMs > minMs) out.push(gap);
+  }
+  return out;
+}
+
 /**
  * Raw words per minute over the rolling window ending at nowMs, from word start times.
  * Until the window fills, it measures from the first word instead, so a take doesn't
- * start out reading as slow.
+ * start out reading as slow. Time inside `pauses` is left out of the span, so pausing
+ * doesn't make the speaker look slow.
  */
-export function windowWpm(wordStartsMs: readonly number[], nowMs: number, windowMs = PACE_WINDOW_MS): number {
+export function windowWpm(wordStartsMs: readonly number[], nowMs: number, windowMs = PACE_WINDOW_MS, pauses: readonly Span[] = []): number {
   if (wordStartsMs.length === 0) return 0;
   const first = Math.min(...wordStartsMs);
-  const span = Math.max(MIN_PACE_SPAN_MS, Math.min(windowMs, nowMs - first));
+  const span = Math.min(windowMs, nowMs - first);
+  const from = nowMs - Math.max(MIN_PACE_SPAN_MS, span);
+  let paused = 0;
+  for (const p of pauses) paused += Math.max(0, Math.min(p.endMs, nowMs) - Math.max(p.startMs, from));
+  const speakingSpan = Math.max(MIN_PACE_SPAN_MS, span - paused);
   let n = 0;
-  for (const t of wordStartsMs) if (t >= nowMs - span && t <= nowMs) n++;
-  return (n * 60_000) / span;
+  for (const t of wordStartsMs) if (t >= from && t <= nowMs) n++;
+  return (n * 60_000) / speakingSpan;
+}
+
+/**
+ * Pace state with hysteresis: enter `fast` above max + HYSTERESIS_WPM and stay until below max;
+ * enter `slow` below min - HYSTERESIS_WPM and stay until above min.
+ */
+export function nextPaceState(prev: PaceState | null, wpm: number | null, zone: PaceZone, hysteresis = HYSTERESIS_WPM): PaceState | null {
+  if (wpm === null) return null;
+  if (prev === 'fast' && wpm >= zone.max) return 'fast';
+  if (prev === 'slow' && wpm <= zone.min) return 'slow';
+  if (wpm > zone.max + hysteresis) return 'fast';
+  if (wpm < zone.min - hysteresis) return 'slow';
+  return 'in';
 }
 
 /**
@@ -60,11 +103,12 @@ export class PaceMeter {
    * @param nowMs the clock, which drives the smoothing
    * @param windowEndMs where the pace window ends: the end of the latest transcribed word.
    *   Transcription lags speech, so a window ending at `nowMs` would always look too slow.
+   * @param pauses silences to leave out of the span (see `longPauses`)
    */
-  update(wordStartsMs: readonly number[], nowMs: number, windowEndMs = nowMs): number {
+  update(wordStartsMs: readonly number[], nowMs: number, windowEndMs = nowMs, pauses: readonly Span[] = []): number {
     // Nothing to measure yet: don't start smoothing from zero.
     if (wordStartsMs.length === 0) return this.value ?? 0;
-    const raw = windowWpm(wordStartsMs, windowEndMs, this.windowMs);
+    const raw = windowWpm(wordStartsMs, windowEndMs, this.windowMs, pauses);
     if (this.value === null || this.lastMs === null) {
       this.value = raw;
     } else {

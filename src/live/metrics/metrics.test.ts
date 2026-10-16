@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { VoiceActivityDetector, frameRms, MIN_PAUSE_MS } from './vad';
 import { DEFAULT_FILLERS, findFillers, fillerMask, normalizeWord } from './fillers';
-import { PaceMeter, paceState, windowWpm, TALK_TYPES } from './pace';
+import { longPauses, nextPaceState, NUDGE_PACE_WINDOW_MS, PaceMeter, paceState, windowWpm, TALK_TYPES } from './pace';
 import { TranscriptTimeline, placeWords } from './timeline';
 import { ghostKey, ghostWpmAt, isBetterTake, summariseTake } from './ghost';
-import { NudgeController, SPOKEN_NUDGES } from './nudges';
+import { NudgeController, OPPOSITE_BLOCK_MS, SPOKEN_NUDGES } from './nudges';
 
 // ---------- synthetic audio ----------
 
@@ -164,6 +164,90 @@ describe('pace', () => {
     expect(paceState(184, zone)).toBe('fast');
     expect(paceState(null, zone)).toBeNull();
   });
+
+  it('leaves long pauses out of pace, so pausing does not read as slow', () => {
+    // 150 wpm for about 3 s, a 1.8 s gap between words, then 150 wpm again.
+    const words = [0, 400, 800, 1200, 1600, 2000, 2400, 4500, 4900, 5300, 5700, 6100, 6500, 6900].map((s) => ({ startMs: s, endMs: s + 300 }));
+    const starts = words.map((w) => w.startMs);
+    const pauses = longPauses(words);
+    expect(pauses).toEqual([{ startMs: 2700, endMs: 4500 }]);
+    expect(windowWpm(starts, 7200, 12_000)).toBeLessThan(120); // pause counted: reads slow
+    expect(windowWpm(starts, 7200, 12_000, pauses)).toBeGreaterThan(140); // articulation rate
+  });
+
+  it('applies hysteresis at the zone edges', () => {
+    const zone = TALK_TYPES.interview.zone; // 130-160
+    expect(nextPaceState('in', 162, zone)).toBe('in');
+    expect(nextPaceState('in', 171, zone)).toBe('fast');
+    expect(nextPaceState('fast', 162, zone)).toBe('fast'); // stays until below max
+    expect(nextPaceState('fast', 159, zone)).toBe('in');
+    expect(nextPaceState('in', 125, zone)).toBe('in');
+    expect(nextPaceState('in', 119, zone)).toBe('slow');
+    expect(nextPaceState('slow', 128, zone)).toBe('slow'); // stays until above min
+    expect(nextPaceState('slow', 131, zone)).toBe('in');
+    expect(nextPaceState(null, 171, zone)).toBe('fast');
+    expect(nextPaceState('in', null, zone)).toBeNull();
+  });
+});
+
+// ---------- pace into nudges, end to end ----------
+
+describe('pace nudges over a whole take', () => {
+  type Block = { ms: number; wpm: number }; // wpm 0 = silence
+
+  /**
+   * Speak a scripted take through the same pipeline the live engine uses: the long nudge window
+   * with long pauses left out, hysteresis, then the nudge controller. Words are transcribed as
+   * soon as they end. Returns each spoken nudge with its time.
+   */
+  function speak(blocks: Block[], zone = TALK_TYPES.interview.zone) {
+    const words: { startMs: number; endMs: number }[] = [];
+    const speech: { startMs: number; endMs: number }[] = [];
+    let t0 = 0;
+    for (const b of blocks) {
+      if (b.wpm > 0) {
+        const every = 60_000 / b.wpm;
+        for (let s = t0; s < t0 + b.ms; s += every) words.push({ startMs: s, endMs: s + every * 0.7 });
+        speech.push({ startMs: t0, endMs: t0 + b.ms });
+      }
+      t0 += b.ms;
+    }
+    const meter = new PaceMeter(NUDGE_PACE_WINDOW_MS);
+    const ctrl = new NudgeController('coach');
+    let state: ReturnType<typeof nextPaceState> = null;
+    const spoken: { kind: string; atMs: number }[] = [];
+    for (let t = 0; t <= t0 + 8000; t += 100) {
+      const heard = words.filter((w) => w.endMs <= t);
+      const speaking = speech.some((s) => t >= s.startMs && t < s.endMs);
+      const lastEnd = Math.max(0, ...speech.filter((s) => s.endMs <= t).map((s) => s.endMs));
+      const starts = heard.map((w) => w.startMs);
+      const frontier = heard.length ? heard[heard.length - 1].endMs : t;
+      const wpm = meter.update(starts, t, Math.min(t, frontier), longPauses(heard));
+      state = starts.length ? nextPaceState(state, Math.round(wpm), zone) : null;
+      const n = ctrl.tick(state, speaking, t, speaking ? 0 : t - lastEnd);
+      if (n.speak) spoken.push({ kind: n.speak, atMs: t });
+    }
+    return spoken;
+  }
+
+  const repeat = (block: Block[], times: number) => Array.from({ length: times }, () => block).flat();
+
+  it('a steady 145 wpm with a 1.5 s pause every 3 s gives no spoken nudges', () => {
+    expect(speak(repeat([{ ms: 3000, wpm: 145 }, { ms: 1500, wpm: 0 }], 20))).toEqual([]);
+  });
+
+  it('15 s at 185 wpm gives exactly one "fast" nudge', () => {
+    const spoken = speak([{ ms: 15_000, wpm: 185 }, { ms: 5000, wpm: 0 }]);
+    expect(spoken.map((s) => s.kind)).toEqual(['fast']);
+  });
+
+  it('15 s fast and 15 s slow, alternating for 2 minutes, never gives opposite nudges within 60 s', () => {
+    const spoken = speak(repeat([{ ms: 14_000, wpm: 185 }, { ms: 1000, wpm: 0 }, { ms: 14_000, wpm: 100 }, { ms: 1000, wpm: 0 }], 4));
+    expect(spoken.length).toBeGreaterThan(0);
+    for (let i = 1; i < spoken.length; i++) {
+      if (spoken[i].kind !== spoken[i - 1].kind) expect(spoken[i].atMs - spoken[i - 1].atMs).toBeGreaterThanOrEqual(OPPOSITE_BLOCK_MS);
+    }
+  });
 });
 
 // ---------- timeline ----------
@@ -281,59 +365,71 @@ describe('NudgeController', () => {
 
   it('never speaks while you are talking, however long you rush', () => {
     const ctrl = new NudgeController('coach');
-    const { spoken, last } = run(ctrl, 'fast', 0, 5900);
+    const { spoken, last } = run(ctrl, 'fast', 0, 10_900);
     expect(spoken).toEqual([]);
     expect(last.waitingForPause).toBe(true);
   });
 
-  it('speaks once a pause of 600 ms arrives after five seconds out of the zone', () => {
+  it('speaks once a pause of 600 ms arrives after ten seconds out of the zone', () => {
     const ctrl = new NudgeController('coach');
-    run(ctrl, 'fast', 0, 5200);
-    expect(run(ctrl, 'fast', 5300, 5800, false, 5300).spoken).toEqual([]); // 500 ms: not yet
-    expect(run(ctrl, 'fast', 5900, 6000, false, 5300).spoken).toEqual([SPOKEN_NUDGES.fast]);
+    run(ctrl, 'fast', 0, 10_200);
+    expect(run(ctrl, 'fast', 10_300, 10_800, false, 10_300).spoken).toEqual([]); // 500 ms: not yet
+    expect(run(ctrl, 'fast', 10_900, 11_000, false, 10_300).spoken).toEqual([SPOKEN_NUDGES.fast]);
   });
 
   it('does not count a short breath as a pause to speak in', () => {
     const ctrl = new NudgeController('coach');
-    run(ctrl, 'fast', 0, 5200);
-    expect(run(ctrl, 'fast', 5300, 5700, false, 5300).spoken).toEqual([]);
-    expect(run(ctrl, 'fast', 5800, 7000).spoken).toEqual([]);
+    run(ctrl, 'fast', 0, 10_200);
+    expect(run(ctrl, 'fast', 10_300, 10_700, false, 10_300).spoken).toEqual([]);
+    expect(run(ctrl, 'fast', 10_800, 12_000).spoken).toEqual([]);
   });
 
   it('skips the nudge if no pause comes within six seconds', () => {
     const ctrl = new NudgeController('coach');
-    run(ctrl, 'fast', 0, 5200); // due at about 5.1 s
-    run(ctrl, 'fast', 5300, 11_500); // talking straight through
-    const late = run(ctrl, 'fast', 11_600, 13_000, false, 11_600);
+    run(ctrl, 'fast', 0, 10_200); // due at about 10.1 s
+    run(ctrl, 'fast', 10_300, 16_500); // talking straight through
+    const late = run(ctrl, 'fast', 16_600, 18_000, false, 16_600);
     expect(late.spoken).toEqual([]);
     expect(late.last.waitingForPause).toBe(false);
   });
 
   it('cancels a waiting nudge when you come back into the zone', () => {
     const ctrl = new NudgeController('coach');
-    run(ctrl, 'fast', 0, 5200);
-    run(ctrl, 'in', 5300, 5500);
-    expect(run(ctrl, 'fast', 5600, 6600, false, 5600).spoken).toEqual([]);
+    run(ctrl, 'fast', 0, 10_200);
+    run(ctrl, 'in', 10_300, 10_500);
+    expect(run(ctrl, 'fast', 10_600, 11_600, false, 10_600).spoken).toEqual([]);
   });
 
   it('never speaks when watching silently', () => {
     const ctrl = new NudgeController('watch');
-    run(ctrl, 'fast', 0, 6000);
-    const { spoken, last } = run(ctrl, 'fast', 6100, 8000, false, 6100);
+    run(ctrl, 'fast', 0, 11_000);
+    const { spoken, last } = run(ctrl, 'fast', 11_100, 13_000, false, 11_100);
     expect(spoken).toEqual([]);
     expect(last.waitingForPause).toBe(false);
   });
 
-  it('speaks once per excursion and respects the 20 s cooldown', () => {
+  it('speaks once per excursion and respects the 45 s cooldown', () => {
     const ctrl = new NudgeController('coach');
-    run(ctrl, 'fast', 0, 5200);
-    expect(run(ctrl, 'fast', 5300, 6000, false, 5300).spoken).toHaveLength(1);
-    run(ctrl, 'in', 6100, 6500);
-    run(ctrl, 'fast', 6600, 12_000);
-    expect(run(ctrl, 'fast', 12_100, 13_000, false, 12_100).spoken).toEqual([]); // inside the cooldown
-    run(ctrl, 'in', 13_100, 13_500);
-    run(ctrl, 'fast', 30_000, 35_500);
-    expect(run(ctrl, 'fast', 35_600, 36_300, false, 35_600).spoken).toHaveLength(1);
+    run(ctrl, 'fast', 0, 10_200);
+    expect(run(ctrl, 'fast', 10_300, 11_000, false, 10_300).spoken).toHaveLength(1); // at 10.9 s
+    run(ctrl, 'in', 11_100, 11_500);
+    run(ctrl, 'fast', 11_600, 22_000);
+    expect(run(ctrl, 'fast', 22_100, 23_000, false, 22_100).spoken).toEqual([]); // inside the cooldown
+    run(ctrl, 'in', 23_100, 23_500);
+    run(ctrl, 'fast', 56_000, 66_500);
+    expect(run(ctrl, 'fast', 66_600, 67_300, false, 66_600).spoken).toHaveLength(1); // 56 s later
+  });
+
+  it('blocks the opposite nudge for 60 s after the last one, even past the cooldown', () => {
+    const ctrl = new NudgeController('coach');
+    run(ctrl, 'fast', 0, 10_200);
+    expect(run(ctrl, 'fast', 10_300, 11_000, false, 10_300).spoken).toEqual([SPOKEN_NUDGES.fast]); // at 10.9 s
+    run(ctrl, 'in', 11_100, 40_000);
+    run(ctrl, 'slow', 40_100, 56_000); // due from ~50 s, but "slow" is blocked until 70.9 s
+    expect(run(ctrl, 'slow', 56_100, 57_000, false, 56_100).spoken).toEqual([]);
+    run(ctrl, 'in', 57_100, 60_000);
+    run(ctrl, 'slow', 60_100, 72_000);
+    expect(run(ctrl, 'slow', 72_100, 73_000, false, 72_100).spoken).toEqual([SPOKEN_NUDGES.slow]);
   });
 
   it('does not count silence towards too slow', () => {

@@ -5,17 +5,23 @@
  * In "Coach me out loud" mode a spoken nudge becomes due after pace has stayed out of the zone
  * for SPOKEN_AFTER_MS of speaking. It then waits for a pause of at least PAUSE_TO_SPEAK_MS, so
  * it never talks over you; if no pause comes within WAIT_FOR_PAUSE_MS it is skipped. Once per
- * excursion, with a cooldown. Silence never counts as "too slow".
+ * excursion, with a cooldown, and never the opposite nudge soon after the last one. Silence
+ * never counts as "too slow". The pace state fed in should come from the long nudge window
+ * with hysteresis (`NUDGE_PACE_WINDOW_MS`, `nextPaceState`).
  */
 import type { PaceState } from './pace';
 
 export type CoachMode = 'watch' | 'coach';
 export type NudgeKind = 'fast' | 'slow';
 
-export const SPOKEN_AFTER_MS = 5000;
+/** Out of the zone this long (while speaking) before a spoken nudge: a sustained habit, not a burst. */
+export const SPOKEN_AFTER_MS = 10_000;
 export const PAUSE_TO_SPEAK_MS = 600;
 export const WAIT_FOR_PAUSE_MS = 6000;
-export const SPOKEN_COOLDOWN_MS = 20_000;
+/** At least this long between spoken nudges, so the coach doesn't nag. */
+export const SPOKEN_COOLDOWN_MS = 45_000;
+/** No spoken nudge of the opposite kind this soon after the last one: "slow down" then "pick it up" is whiplash. */
+export const OPPOSITE_BLOCK_MS = 60_000;
 
 export const SPOKEN_NUDGES: Record<NudgeKind, string> = {
   fast: 'Slow down. Let the result land.',
@@ -38,6 +44,7 @@ export class NudgeController {
   private outMs = 0;
   private spokenThisExcursion = false;
   private lastSpokenAt = -Infinity;
+  private lastSpokenKind: NudgeKind | null = null;
   private lastTick: number | null = null;
   private pending: { kind: NudgeKind; since: number } | null = null;
 
@@ -75,14 +82,17 @@ export class NudgeController {
       }
     }
 
-    // Due: long enough out of the zone, coach mode, not yet said, not in the cooldown.
+    // Due: long enough out of the zone, coach mode, not yet said, not in the cooldown,
+    // and not the opposite of a nudge said within OPPOSITE_BLOCK_MS.
+    const sinceSpoken = nowMs - this.lastSpokenAt;
     if (
       this.mode === 'coach' &&
       !this.pending &&
       out &&
       !this.spokenThisExcursion &&
       this.outMs > SPOKEN_AFTER_MS &&
-      nowMs - this.lastSpokenAt >= SPOKEN_COOLDOWN_MS
+      sinceSpoken >= SPOKEN_COOLDOWN_MS &&
+      !(this.lastSpokenKind && this.lastSpokenKind !== out && sinceSpoken < OPPOSITE_BLOCK_MS)
     ) {
       this.pending = { kind: out, since: nowMs };
     }
@@ -98,6 +108,7 @@ export class NudgeController {
         this.pending = null;
         this.spokenThisExcursion = true;
         this.lastSpokenAt = nowMs;
+        this.lastSpokenKind = speak;
       }
     }
 
