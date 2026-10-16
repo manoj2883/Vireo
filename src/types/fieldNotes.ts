@@ -25,6 +25,14 @@ export interface Drill {
   minutes: number;
 }
 
+export interface NaturalPhrasing {
+  /** Verbatim from the transcript. */
+  original: string;
+  /** How a native American English speaker would say it. */
+  natural: string;
+  why: string;
+}
+
 export interface FieldNotes {
   verdict: string;
   /** The single most important change, as an instruction for the next take. Absent in older notes. */
@@ -39,6 +47,8 @@ export interface FieldNotes {
   notes: FieldNote[];
   audienceFollowUp: { question: string; reason: string };
   drills: Drill[];
+  /** "Say it more naturally": up to three lines, each quoted from the transcript. Absent in older notes. */
+  naturalPhrasing?: NaturalPhrasing[];
   provider?: string;
   model?: string;
   /** Notes dropped because their quote wasn't in the transcript. */

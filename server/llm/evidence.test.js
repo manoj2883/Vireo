@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { indexTranscript, normalizeForQuote, verifyNotes, verifyPreviousFix } from './evidence.js';
+import { indexTranscript, normalizeForQuote, verifyNotes, verifyPhrasing, verifyPreviousFix } from './evidence.js';
 
 const LINES = [
   { speaker: 'user', text: 'So my research is about teaching AI systems to say no', startMs: 400 },
@@ -16,6 +16,17 @@ describe('normalizeForQuote', () => {
     expect(normalizeForQuote('  Um,   so basically, ')).toBe('Um so basically');
     expect(normalizeForQuote('don’t—stop')).toBe('don t stop');
     expect(normalizeForQuote('Say "No"!')).toBe('Say No');
+  });
+});
+
+describe('verifyPhrasing', () => {
+  it('keeps lines the speaker said and drops a fabricated original', () => {
+    const real = { original: 'the right ones to refuse', natural: 'the ones it should have refused', why: 'Shorter and clearer.' };
+    const fake = { original: 'I was so much joyful', natural: 'I was really happy', why: 'x' };
+    const coach = { original: 'Let the result land', natural: 'x', why: 'x' };
+    expect(verifyPhrasing([real, fake, coach], LINES)).toEqual([real]);
+    expect(verifyPhrasing(undefined, LINES)).toEqual([]);
+    expect(verifyPhrasing([], LINES)).toEqual([]);
   });
 });
 

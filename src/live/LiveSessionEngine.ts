@@ -7,7 +7,7 @@ import type { PauseSpan, WordSegment } from '@/components/sonogram/types';
 import type { AudioFrameReading } from '@/audio/pitch/PitchTracker';
 import { VoiceActivityDetector } from './metrics/vad';
 import { TranscriptTimeline } from './metrics/timeline';
-import { PaceMeter, paceState, TALK_TYPES, type PaceState, type PaceZone, type TalkType } from './metrics/pace';
+import { longPauses, nextPaceState, NUDGE_PACE_WINDOW_MS, PaceMeter, paceState, TALK_TYPES, type PaceState, type PaceZone, type TalkType } from './metrics/pace';
 import { NudgeController, SPOKEN_NUDGES, type CoachMode } from './metrics/nudges';
 import { ghostKey, ghostWpmAt, isBetterTake, summariseTake, type PaceTake } from './metrics/ghost';
 import { DEFAULT_FILLERS, findFillers } from './metrics/fillers';
@@ -147,7 +147,11 @@ export class LiveSessionEngine {
 
   private readonly vad = new VoiceActivityDetector();
   private readonly timeline: TranscriptTimeline;
+  /** Short window: the visual pace dot only. */
   private readonly pace = new PaceMeter();
+  /** Long window: every nudge decision, with hysteresis so one pause or burst can't flip it. */
+  private readonly nudgePace = new PaceMeter(NUDGE_PACE_WINDOW_MS);
+  private nudgeState: PaceState | null = null;
   private readonly nudges: NudgeController;
 
   private client: LiveClientLike | null = null;
@@ -268,9 +272,14 @@ export class LiveSessionEngine {
 
   /** Recompute metrics and the snapshot. Runs on a timer during a session. */
   tick(nowMs = this.elapsed()): LiveSnapshot {
-    const wpm = this.pace.update(this.timeline.wordStarts(), nowMs, Math.min(nowMs, this.timeline.frontierMs() ?? nowMs));
+    const starts = this.timeline.wordStarts();
+    const windowEnd = Math.min(nowMs, this.timeline.frontierMs() ?? nowMs);
+    const pauses = longPauses(this.timeline.getWords());
+    const wpm = this.pace.update(starts, nowMs, windowEnd, pauses);
+    const nudgeWpm = this.nudgePace.update(starts, nowMs, windowEnd, pauses);
     const speaking = this.vad.isSpeaking();
-    const state = this.timeline.getWords().length ? paceState(Math.round(wpm), this.zone) : null;
+    this.nudgeState = starts.length ? nextPaceState(this.nudgeState, Math.round(nudgeWpm), this.zone) : null;
+    const state = this.nudgeState;
 
     const open = this.vad.getOpenPause(nowMs);
     const pauseMs = open ? nowMs - open.startMs : 0;

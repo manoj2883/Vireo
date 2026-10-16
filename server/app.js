@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { generateTeardown, generateTightened, describeProvider, TeardownError } from './llm/index.js';
-import { verifyNotes, verifyPreviousFix } from './llm/evidence.js';
+import { verifyNotes, verifyPhrasing, verifyPreviousFix } from './llm/evidence.js';
 import { grantSttToken, SttTokenError } from './stt.js';
 import { createLimiter, identifyVisitor } from './limits.js';
 
@@ -82,6 +82,7 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
         ...result.notes,
         notes,
         previousFix: verifyPreviousFix(result.notes.previousFix, lines),
+        naturalPhrasing: verifyPhrasing(result.notes.naturalPhrasing, lines),
         droppedNotes: dropped.length,
       });
     } catch (err) {

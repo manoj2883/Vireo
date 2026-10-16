@@ -99,7 +99,7 @@ Vireo measures as much as it can on your device, and is explicit about what it s
 
 | What | When | Goes to |
 | :--- | :--- | :--- |
-| Microphone audio (16 kHz) | During a live session | **Deepgram**, directly from your browser, for transcription. The server only issues the short-lived token that opens the connection. |
+| Microphone audio (16 kHz), plus keyterms: distinctive words from your question and story, and your "Words Vireo should know" | During a live session | **Deepgram**, directly from your browser, for transcription. The server only issues the short-lived token that opens the connection. |
 | Transcript text and timestamps, your prompt, situation, pace zone, on-device metrics, camera events (not images) and the chosen Story Bank outline | When field notes and the tightened answer are written | The Vireo server, which sends it to the provider in `LLM_PROVIDER` (and `LLM_FALLBACKS` if that one is busy): **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model you choose). |
 | An anonymous random cookie and your IP address | When a session starts and when notes are written | The Vireo server, only to apply usage limits. Counters are kept in **Upstash Redis** when it's configured. |
 
@@ -179,9 +179,11 @@ Vireo deploys to [Vercel](https://vercel.com). The front end is served as static
 1. Import the GitHub repo in Vercel. The build command and output come from `package.json` and `vercel.json`.
 2. In the project's **Environment Variables**, add the same keys as `.env.example`: at least `DEEPGRAM_API_KEY` and one field notes provider.
 3. For usage limits shared across serverless instances, add the **Upstash** integration from the Vercel Marketplace (it sets `KV_REST_API_URL` and `KV_REST_API_TOKEN`) or set `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
-4. Deploy, then open `/api/health` on the live URL to check both keys are seen.
+4. Deploy, then open `/api/health` on the live URL to check both keys are seen. If either is missing, the launch and warm-up pages say the demo is resting and won't start a session.
 
 **Usage limits** (all optional, defaults in `.env.example`): sessions per visitor per hour and per day, sessions per IP per hour, field notes calls per visitor and per IP per hour, and `DAILY_SESSION_CAP`, a site-wide limit on transcription sessions per UTC day. Every live session also stops at 10 minutes. Without Upstash, counters are kept in memory, which is fine for one local server.
+
+For a public launch, set `DAILY_SESSION_CAP=50` (the code default is 300) and raise it once you've seen real usage. Also set a spending limit (or at least a usage alert) in your Deepgram console, so a traffic spike can’t run up a bill unnoticed.
 
 ## Recording the demo
 

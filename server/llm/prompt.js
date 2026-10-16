@@ -19,6 +19,7 @@ Produce:
 - Camera notes (only when camera events are given): you may add up to two notes about eye contact, posture, gestures or expression. Each must set cameraEventId to the id of the event it is about, use that event's startMs, and may leave quote empty. Never mention a camera observation that has no event. Describe expression neutrally (smiling, brows lowered); never guess emotions.
 - audienceFollowUp: the one follow-up question a sharp listener would ask next, and the reason you chose it.
 - drills: one to three drills, each specific, repeatable and under ten minutes, aimed at the most important fix.
+- naturalPhrasing: up to three lines whose phrasing would sound non-native or unclear to an interviewer or audience (for example "so much joyful"). original is copied character for character from the transcript, like a quote; natural is how a native American English speaker would say it in this situation; why is one plain sentence. Keep the speaker's meaning exactly: change the wording, never what they said. Skip fillers and pacing, which other notes cover. If no line qualifies, return an empty array.
 
 Return only JSON matching the schema. No markdown.`;
 

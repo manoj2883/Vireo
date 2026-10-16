@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { IDBFactory } from 'fake-indexeddb';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { AppRoutes } from '@/routes';
-import { getSession, listStories, resetLocalDbConnection, saveSession, saveStory, type StoredSession } from '@/storage/localDb';
+import { getCustomTerms, getSession, listStories, resetLocalDbConnection, saveSession, saveStory, type StoredSession } from '@/storage/localDb';
 import { saveConfig } from '@/session/config';
 import { fieldNotesRetry } from '@/session/fieldNotesApi';
 import { PaceBand } from '@/components/hud/PaceBand';
@@ -87,6 +87,28 @@ describe('routes', () => {
     renderAt('/');
     expect(screen.getByRole('heading', { level: 1, name: /see your voice/i })).toBeInTheDocument();
     expect(screen.getByRole('img', { name: /um, so basically, our results were/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Try a session' })).toHaveAttribute('href', '/warm-up');
+  });
+
+  it('says the demo is resting and won’t start a session when the server has no keys', async () => {
+    mockFetch({ ok: true, body: { status: 'ok', transcription: { provider: 'deepgram', configured: false }, fieldNotes: { name: 'gemini', configured: false } } });
+    const { unmount } = renderAt('/');
+    expect(await screen.findByText(/the public demo is resting\. run vireo locally in a few minutes\./i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'See local setup' })).toHaveAttribute('href', 'https://github.com/manoj2883/Vireo#local-setup');
+    expect(screen.getByRole('button', { name: 'Try a session' })).toBeDisabled();
+    expect(screen.queryByRole('link', { name: 'Try a session' })).toBeNull();
+    unmount();
+
+    renderAt('/warm-up');
+    await screen.findByText(/the public demo is resting/i);
+    expect(screen.getByRole('button', { name: /start speaking/i })).toBeDisabled();
+  });
+
+  it('shows no banner when the server has both keys', async () => {
+    const spy = mockFetch({ ok: true, body: { transcription: { configured: true }, fieldNotes: { configured: true } } });
+    renderAt('/');
+    await waitFor(() => expect(spy).toHaveBeenCalledWith('/api/health'));
+    expect(screen.queryByText(/the public demo is resting/i)).toBeNull();
     expect(screen.getByRole('link', { name: 'Try a session' })).toHaveAttribute('href', '/warm-up');
   });
 
@@ -217,6 +239,27 @@ describe('Field notes', () => {
     expect((await getSession('sess_1'))?.notesStatus).toBe('ready');
   });
 
+  it('shows nothing for "Say it more naturally" when there are no lines', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: { ...NOTES, naturalPhrasing: [] } }));
+    renderAt('/notes/sess_1');
+    await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' });
+    expect(screen.queryByRole('heading', { name: 'Say it more naturally' })).toBeNull();
+  });
+
+  it('shows "Say it more naturally", collapsed except for Speaking English with confidence', async () => {
+    const naturalPhrasing = [{ original: 'so much joyful', natural: 'really happy', why: 'For a feeling, say happy.' }];
+    for (const situationId of ['interview', 'english'] as const) {
+      await saveSession(storedSession({ notesStatus: 'ready', notes: { ...NOTES, naturalPhrasing }, config: { ...storedSession().config, situationId } }));
+      const { unmount } = renderAt('/notes/sess_1');
+      const heading = await screen.findByRole('heading', { name: 'Say it more naturally' });
+      const details = heading.closest('details')!;
+      expect(details.open).toBe(situationId === 'english');
+      expect(within(details).getByText('really happy')).toBeInTheDocument();
+      expect(within(details).getByText('so much joyful')).toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it('pins the selected note and seeks the transcript to its moment', async () => {
     await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
     renderAt('/notes/sess_1');
@@ -340,6 +383,18 @@ describe('Home', () => {
     expect(screen.getByRole('heading', { name: /your last 2 sessions, drawn/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /2\.1 fillers a minute\. open field notes/i })).toHaveAttribute('href', '/notes/b');
     expect(screen.getByText('Follow-up question waiting')).toBeInTheDocument();
+  });
+
+  it('saves the words Vireo should know on this device', async () => {
+    renderAt('/app');
+    const section = await screen.findByRole('region', { name: 'Words Vireo should know' });
+    const input = within(section).getByRole('textbox');
+    await waitFor(() => expect(input).toHaveValue(''));
+    fireEvent.change(input, { target: { value: 'Manoj Kumar,  Blooming Clouds, LangGraph, langgraph' } });
+    fireEvent.click(within(section).getByRole('button', { name: 'Save words' }));
+    expect(await within(section).findByRole('status')).toHaveTextContent('Saved 3 words.');
+    expect(input).toHaveValue('Manoj Kumar, Blooming Clouds, LangGraph');
+    expect(await getCustomTerms()).toEqual(['Manoj Kumar', 'Blooming Clouds', 'LangGraph']);
   });
 });
 
@@ -572,14 +627,23 @@ describe('Take it with you', () => {
     renderAt('/notes/sess_1');
     const section = await screen.findByRole('region', { name: 'Take it with you' });
     expect(within(section).getByRole('checkbox', { name: /include my words/i })).not.toBeChecked();
-    expect(within(section).getByRole('button', { name: 'Add 3 reminders to my calendar' })).toBeDisabled();
+    expect(within(section).getByRole('button', { name: 'Apple Calendar / Outlook desktop (.ics)' })).toBeDisabled();
+    expect(within(section).queryByRole('list', { name: 'Google Calendar reminders' })).toBeNull();
 
     const inTen = new Date();
     inTen.setDate(inTen.getDate() + 10);
     const day = `${inTen.getFullYear()}-${String(inTen.getMonth() + 1).padStart(2, '0')}-${String(inTen.getDate()).padStart(2, '0')}`;
     fireEvent.change(within(section).getByLabelText(/when is the real interview/i), { target: { value: day } });
-    expect(within(section).getAllByRole('listitem')).toHaveLength(3);
-    expect(within(section).getByRole('button', { name: 'Add 3 reminders to my calendar' })).toBeEnabled();
+    expect(within(within(section).getByRole('list', { name: 'Rehearsal days' })).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(section).getByRole('button', { name: 'Apple Calendar / Outlook desktop (.ics)' })).toBeEnabled();
+    for (const name of ['Google Calendar reminders', 'Outlook.com reminders']) {
+      const links = within(within(section).getByRole('list', { name })).getAllByRole('link');
+      expect(links).toHaveLength(3);
+      for (const a of links) {
+        expect(a).toHaveAttribute('target', '_blank');
+        expect(a).toHaveAttribute('rel', 'noopener noreferrer');
+      }
+    }
   });
 
   it('explains a date that is too soon', async () => {

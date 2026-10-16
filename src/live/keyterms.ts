@@ -13,6 +13,45 @@ const COMMON = new Set(
 
 const MAX_PHRASE_WORDS = 4;
 
+/** Words the user asks Vireo to know (name, company, terms), at most. */
+export const MAX_CUSTOM_TERMS = 20;
+/** A custom term longer than this is a sentence, not a term. */
+export const MAX_CUSTOM_TERM_CHARS = 60;
+/**
+ * Keyterms sent per session, at most. Deepgram caps keyterms at 500 tokens per request and
+ * advises focusing on the 20-50 most important (https://developers.deepgram.com/docs/keyterm).
+ */
+export const MAX_KEYTERMS = 50;
+
+/** "Manoj Kumar, Blooming Clouds,  LangGraph" → trimmed, de-duplicated terms, up to MAX_CUSTOM_TERMS. */
+export function parseCustomTerms(text: string): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of text.split(/[,\n]/)) {
+    const term = raw.replace(/\s+/g, ' ').trim().slice(0, MAX_CUSTOM_TERM_CHARS).trim();
+    const key = term.toLowerCase();
+    if (!term || seen.has(key)) continue;
+    seen.add(key);
+    out.push(term);
+    if (out.length >= MAX_CUSTOM_TERMS) break;
+  }
+  return out;
+}
+
+/** The user's own terms first, then the built-in ones, without repeats, up to `max`. */
+export function mergeKeyterms(custom: readonly string[], builtIn: readonly string[], max = MAX_KEYTERMS): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const t of [...parseCustomTerms(custom.join(',')), ...builtIn]) {
+    const key = t.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(t);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
 function words(text: string): string[] {
   return text
     .replace(/[‘’]/g, "'")

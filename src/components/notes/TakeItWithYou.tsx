@@ -2,7 +2,7 @@ import { useId, useState } from 'react';
 import { CalendarPlus, FileDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { buildReport, reportPdfBlob } from '@/lib/report';
-import { buildIcs, isoDay, MAX_DAYS_AHEAD, MIN_DAYS_AHEAD, rehearsalDays } from '@/lib/reminders';
+import { buildIcs, googleCalendarLinks, isoDay, MAX_DAYS_AHEAD, MIN_DAYS_AHEAD, outlookLinks, rehearsalDays } from '@/lib/reminders';
 import { saveBlob } from '@/lib/shareCard';
 import { situationById } from '@/session/situations';
 import type { StoredSession } from '@/storage/localDb';
@@ -45,17 +45,25 @@ export function TakeItWithYou({ session, previous }: { session: StoredSession; p
     }
   }
 
+  const drills = session.notes?.drills.map((d) => d.title) ?? [];
+  const reminderInput = {
+    today,
+    eventDay,
+    prompt: session.config.prompt,
+    situationId: session.config.situationId,
+    drills: drills.length ? drills : session.notes?.oneFix ? [session.notes.oneFix.instruction] : [],
+    origin: window.location.origin,
+  };
+  // Web calendars take one event per link, so there's a link per rehearsal day.
+  const webCalendars = days
+    ? [
+        { name: 'Google Calendar', links: googleCalendarLinks(reminderInput) },
+        { name: 'Outlook.com', links: outlookLinks(reminderInput) },
+      ]
+    : [];
+
   function downloadReminders() {
-    const drills = session.notes?.drills.map((d) => d.title) ?? [];
-    const ics = buildIcs({
-      today,
-      eventDay,
-      prompt: session.config.prompt,
-      situationId: session.config.situationId,
-      drills: drills.length ? drills : session.notes?.oneFix ? [session.notes.oneFix.instruction] : [],
-      origin: window.location.origin,
-    });
-    saveBlob(new Blob([ics], { type: 'text/calendar;charset=utf-8' }), 'vireo-rehearsals.ics');
+    saveBlob(new Blob([buildIcs(reminderInput)], { type: 'text/calendar;charset=utf-8' }), 'vireo-rehearsals.ics');
   }
 
   return (
@@ -66,7 +74,7 @@ export function TakeItWithYou({ session, previous }: { session: StoredSession; p
       <div className="grid gap-10 md:grid-cols-2">
         <div className="flex flex-col gap-4">
           <h3 className="m-0 text-heading">Download your report</h3>
-          <p className="m-0 text-body text-ink-muted">One page: your one fix, your answer tightened, the numbers{previous ? ' before and after' : ''} and your drills. Made on this device; nothing is sent anywhere.</p>
+          <p className="m-0 text-body text-ink-muted">One page: your one fix, your answer tightened, the numbers{previous ? ' before and after' : ''} and your drills. This PDF and the share card are made on your device.</p>
           <label htmlFor={wordsId} className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-label">
             <input id={wordsId} type="checkbox" className="h-5 w-5 accent-[rgb(var(--olive))]" checked={includeWords} onChange={(e) => setIncludeWords(e.target.checked)} />
             Include my words (adds the transcript on page 2)
@@ -113,10 +121,24 @@ export function TakeItWithYou({ session, previous }: { session: StoredSession; p
           <div>
             <Button size="lg" variant="outline" onClick={downloadReminders} disabled={!days}>
               <CalendarPlus className="h-4 w-4" aria-hidden="true" />
-              Add 3 reminders to my calendar
+              Apple Calendar / Outlook desktop (.ics)
             </Button>
           </div>
-          <p className="m-0 text-small text-ink-muted">Downloads an .ics file for any calendar app. Each reminder links back to this question, never to what you said. No email needed.</p>
+          {webCalendars.map((cal) => (
+            <div key={cal.name} className="flex flex-col gap-1">
+              <p className="m-0 text-label">{cal.name}, one link per rehearsal</p>
+              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-small" aria-label={`${cal.name} reminders`}>
+                {cal.links.map((l) => (
+                  <li key={l.href}>
+                    <a href={l.href} target="_blank" rel="noopener noreferrer" className="text-olive underline-offset-4 hover:underline">
+                      {l.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+          <p className="m-0 text-small text-ink-muted">Each reminder links back to this question, never to what you said. No email needed.</p>
         </div>
       </div>
     </section>

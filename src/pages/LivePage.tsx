@@ -16,8 +16,8 @@ import { situationById } from '@/session/situations';
 import { sessionCap } from '@/live/sessionCap';
 import { LiveSessionEngine } from '@/live/LiveSessionEngine';
 import { useLiveSnapshot } from '@/live/useLiveSession';
-import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory, newId } from '@/storage/localDb';
-import { buildKeyterms } from '@/live/keyterms';
+import { getGhost, putGhost, saveSession, sessionFromResult, getStory, saveStory, newId, getCustomTerms } from '@/storage/localDb';
+import { buildKeyterms, mergeKeyterms } from '@/live/keyterms';
 import { loadConfig, saveConfig, type SessionConfig } from '@/session/config';
 
 /** Live session (`/session`): camera frame, scrolling sonogram ribbon and glanceable cues. */
@@ -41,10 +41,14 @@ function LiveSession({ config }: { config: SessionConfig }) {
     let e: LiveSessionEngine | null = null;
     let cancelled = false;
     (async () => {
-      // Words the speaker is likely to say help the transcriber: the prompt and the story's key points.
-      const story = config.storyId ? await getStory(config.storyId).catch(() => undefined) : undefined;
+      // Words the speaker is likely to say help the transcriber: their own "words Vireo should know"
+      // first, then the prompt and the story's key points.
+      const [story, custom] = await Promise.all([
+        config.storyId ? getStory(config.storyId).catch(() => undefined) : undefined,
+        getCustomTerms().catch(() => []),
+      ]);
       if (cancelled) return;
-      const keyterms = buildKeyterms({ prompt: config.prompt, storyTitle: story?.title, keyPoints: story?.keyPoints });
+      const keyterms = mergeKeyterms(custom, buildKeyterms({ prompt: config.prompt, storyTitle: story?.title, keyPoints: story?.keyPoints }));
       e = new LiveSessionEngine(
         { mode: config.mode, talkType: config.talkType, prompt: config.prompt, storyId: config.storyId, keyterms, calibration: config.calibration },
         { ghostStore: { get: getGhost, put: putGhost } }

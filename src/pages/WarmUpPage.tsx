@@ -9,6 +9,8 @@ import { DEFAULT_CONFIG, loadConfig, saveConfig, type SessionConfig, type WarmUp
 import { SITUATIONS, situationById, type SituationId } from '@/session/situations';
 import { listStories, type StoredStory } from '@/storage/localDb';
 import { usePreviewMedia } from '@/components/hud/usePreviewMedia';
+import { DemoResting } from '@/components/DemoResting';
+import { useDemoHealth } from '@/lib/health';
 
 type Source = SituationId | 'own' | 'story';
 const ALL_QUESTIONS = SITUATIONS.flatMap((x) => x.questions);
@@ -81,7 +83,9 @@ export function WarmUpPage() {
   const situation = situationById(config.situationId);
   const source: Source = situation ? situation.id : config.storyId ? 'story' : 'own';
   const story = stories.find((s) => s.id === config.storyId);
-  const canStart = config.prompt.trim().length > 0;
+  // A server without its keys can't transcribe or write notes: don't start a session that can't work.
+  const resting = useDemoHealth() === 'resting';
+  const canStart = config.prompt.trim().length > 0 && !resting;
 
   function pickSource(next: Source) {
     setConfig((c) => {
@@ -368,9 +372,9 @@ export function WarmUpPage() {
             <Play className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
             Start speaking
           </Button>
-          {!canStart && <p className="m-0 text-small text-ink-muted">Write what you’re answering first.</p>}
+          {resting ? <DemoResting /> : !canStart && <p className="m-0 text-small text-ink-muted">Write what you’re answering first.</p>}
           <p id={ids.privacy} className="m-0 text-small text-ink-muted">
-            Video is analysed on this device and never leaves it. Transcripts and notes stay on this device until you delete them.
+            Video is analysed on this device and never leaves it. Your audio goes to Deepgram to be transcribed, and your transcript goes to the field notes model. Sessions are saved only on this device until you delete them.
           </p>
         </aside>
       </div>

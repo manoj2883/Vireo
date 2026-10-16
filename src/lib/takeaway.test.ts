@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildReport, makeReportPdf, pdfSafe } from './report';
-import { buildIcs, foldLine, rehearsalDays, warmUpLink } from './reminders';
+import { buildIcs, foldLine, googleCalendarLinks, icsEscape, outlookLinks, rehearsalDays, reminderEvents, warmUpLink } from './reminders';
 import type { StoredSession } from '@/storage/localDb';
 
 const WORDS = 'Honestly my thesis measured refusal calibration across seven benchmarks';
@@ -122,6 +122,46 @@ describe('rehearsal reminders (.ics)', () => {
       expect([...u.searchParams.keys()].sort()).toEqual(['drill', 'prompt', 'situation']);
     }
     expect(ics).not.toContain('thesis');
+  });
+
+  it('makes Google and Outlook links with the same dates and 6:00-6:20 pm times as the .ics', () => {
+    const ics = buildIcs(input).replace(/\r\n /g, '').split('\r\n');
+    const icsTimes = ics.filter((l) => /^DT(START|END):/.test(l)).map((l) => l.split(':')[1]);
+    expect(icsTimes).toEqual(['20261016T180000', '20261016T182000', '20261019T180000', '20261019T182000', '20261023T180000', '20261023T182000']);
+    const summaries = ics.filter((l) => l.startsWith('SUMMARY:'));
+
+    const google = googleCalendarLinks(input);
+    expect(google).toHaveLength(3);
+    const googleTimes = google.flatMap((g) => new URL(g.href).searchParams.get('dates')!.split('/'));
+    expect(googleTimes).toEqual(icsTimes); // no Z: local time, like the .ics
+    for (const g of google) {
+      const u = new URL(g.href);
+      expect(u.origin + u.pathname).toBe('https://calendar.google.com/calendar/render');
+      expect(u.searchParams.get('action')).toBe('TEMPLATE');
+    }
+
+    const outlook = outlookLinks(input);
+    expect(outlook).toHaveLength(3);
+    const outlookTimes = outlook.flatMap((o) => {
+      const u = new URL(o.href);
+      return [u.searchParams.get('startdt'), u.searchParams.get('enddt')].map((t) => t!.replace(/[-:]/g, ''));
+    });
+    expect(outlookTimes).toEqual(icsTimes);
+    expect(new URL(outlook[0].href).searchParams.get('startdt')).toBe('2026-10-16T18:00:00');
+    expect(outlook[0].href.startsWith('https://outlook.live.com/calendar/0/deeplink/compose?')).toBe(true);
+
+    // Same title and description everywhere.
+    const events = reminderEvents(input);
+    events.forEach((e, i) => {
+      expect(summaries[i]).toBe(`SUMMARY:${icsEscape(e.title)}`);
+      expect(new URL(google[i].href).searchParams.get('text')).toBe(e.title);
+      expect(new URL(google[i].href).searchParams.get('details')).toBe(e.description);
+      expect(new URL(outlook[i].href).searchParams.get('subject')).toBe(e.title);
+      expect(new URL(outlook[i].href).searchParams.get('body')).toBe(e.description);
+      expect(e.description).toContain(e.link);
+    });
+    expect(google.map((g) => g.label)).toEqual(['Fri 16 Oct — Result first', 'Mon 19 Oct — Pause before numbers', 'Fri 23 Oct — Result first']);
+    expect(outlook.map((o) => o.label)).toEqual(google.map((g) => g.label));
   });
 
   it('folds long lines without splitting characters', () => {

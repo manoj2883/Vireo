@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Sonogram } from '@/components/sonogram';
 import { deleteAllData, listSessions, listStories, type StoredSession, type StoredStory } from '@/storage/localDb';
 import { ConfirmDelete } from '@/components/ConfirmDelete';
+import { KnownWords } from '@/components/KnownWords';
 import { bestImprovementThisWeek, describeChange } from '@/lib/compare';
 import { saveConfig, type SessionConfig } from '@/session/config';
 
@@ -16,6 +17,8 @@ export function HomePage() {
   const navigate = useNavigate();
   const [sessions, setSessions] = useState<StoredSession[] | null>(null);
   const [stories, setStories] = useState<StoredStory[]>([]);
+  // Remounts "Words Vireo should know" after Delete all data, so it shows the empty list.
+  const [wordsKey, setWordsKey] = useState(0);
 
   useEffect(() => {
     listSessions().then(setSessions).catch(() => setSessions([]));
@@ -199,6 +202,8 @@ export function HomePage() {
         )}
       </section>
 
+      <KnownWords key={wordsKey} />
+
       <section aria-labelledby="data-h" className="flex flex-col gap-4 border-t border-line pt-10">
         <h2 id="data-h" className="m-0 text-heading">
           Your data stays here
@@ -209,12 +214,13 @@ export function HomePage() {
         <div>
           <ConfirmDelete
             label="Delete all data"
-            warning="This deletes every session, note and story on this device."
+            warning="This deletes every session, note, story and saved word on this device."
             confirmLabel="Delete everything"
             onConfirm={async () => {
               await deleteAllData();
               setSessions([]);
               setStories([]);
+              setWordsKey((k) => k + 1);
             }}
           />
         </div>
