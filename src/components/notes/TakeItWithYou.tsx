@@ -74,7 +74,7 @@ export function TakeItWithYou({ session, previous }: { session: StoredSession; p
       <div className="grid gap-10 md:grid-cols-2">
         <div className="flex flex-col gap-4">
           <h3 className="m-0 text-heading">Download your report</h3>
-          <p className="m-0 text-body text-ink-muted">One page: your one fix, your answer tightened, the numbers{previous ? ' before and after' : ''} and your drills. Made on this device; nothing is sent anywhere.</p>
+          <p className="m-0 text-body text-ink-muted">One page: your one fix, your answer tightened, the numbers{previous ? ' before and after' : ''} and your drills. This PDF and the share card are made on your device.</p>
           <label htmlFor={wordsId} className="inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-label">
             <input id={wordsId} type="checkbox" className="h-5 w-5 accent-[rgb(var(--olive))]" checked={includeWords} onChange={(e) => setIncludeWords(e.target.checked)} />
             Include my words (adds the transcript on page 2)
