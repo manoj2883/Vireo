@@ -61,6 +61,19 @@ export function verifyPreviousFix(previousFix, lines) {
 }
 
 /**
+ * "Say it more naturally" items: each `original` must be words the speaker actually said, like a
+ * note's quote, or the item is dropped.
+ * @template {{ original: string }} P
+ * @param {P[] | null | undefined} items
+ * @param {{ speaker?: string, text: string, startMs: number }[]} lines
+ * @returns {P[]}
+ */
+export function verifyPhrasing(items, lines) {
+  if (!Array.isArray(items)) return [];
+  return items.filter((item) => verifyNotes([{ quote: item.original, startMs: 0 }], lines).notes.length > 0);
+}
+
+/**
  * Keep only notes backed by evidence. A speech note's quote must be in the transcript; a kept
  * note whose startMs falls outside the line where its quote begins is moved to that line's start.
  * A camera note must reference a real camera event id; it is moved to that event if its time is off.

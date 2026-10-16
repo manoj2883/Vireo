@@ -217,6 +217,27 @@ describe('Field notes', () => {
     expect((await getSession('sess_1'))?.notesStatus).toBe('ready');
   });
 
+  it('shows nothing for "Say it more naturally" when there are no lines', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: { ...NOTES, naturalPhrasing: [] } }));
+    renderAt('/notes/sess_1');
+    await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' });
+    expect(screen.queryByRole('heading', { name: 'Say it more naturally' })).toBeNull();
+  });
+
+  it('shows "Say it more naturally", collapsed except for Speaking English with confidence', async () => {
+    const naturalPhrasing = [{ original: 'so much joyful', natural: 'really happy', why: 'For a feeling, say happy.' }];
+    for (const situationId of ['interview', 'english'] as const) {
+      await saveSession(storedSession({ notesStatus: 'ready', notes: { ...NOTES, naturalPhrasing }, config: { ...storedSession().config, situationId } }));
+      const { unmount } = renderAt('/notes/sess_1');
+      const heading = await screen.findByRole('heading', { name: 'Say it more naturally' });
+      const details = heading.closest('details')!;
+      expect(details.open).toBe(situationId === 'english');
+      expect(within(details).getByText('really happy')).toBeInTheDocument();
+      expect(within(details).getByText('so much joyful')).toBeInTheDocument();
+      unmount();
+    }
+  });
+
   it('pins the selected note and seeks the transcript to its moment', async () => {
     await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
     renderAt('/notes/sess_1');

@@ -56,6 +56,23 @@ describe('POST /api/field-notes', () => {
     expect(generate).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ startMs: 6200 })]), { prompt: 'Tell me' });
   });
 
+  it('keeps only "say it more naturally" lines the speaker really said', async () => {
+    const naturalPhrasing = [
+      { original: 'the right ones to refuse', natural: 'the ones it should refuse', why: 'Simpler.' },
+      { original: 'so much joyful', natural: 'really happy', why: 'Invented.' },
+    ];
+    const generate = vi.fn().mockResolvedValue({ notes: { ...structuredClone(NOTES), naturalPhrasing }, provider: 'fake', model: 'fake-1', attempts: 1 });
+    const { post } = await start({ generate });
+    const res = await post({ transcript: TRANSCRIPT });
+    expect(res.body.naturalPhrasing).toEqual([naturalPhrasing[0]]);
+  });
+
+  it('returns an empty natural phrasing list when the model gives none', async () => {
+    const generate = vi.fn().mockResolvedValue({ notes: structuredClone(NOTES), provider: 'fake', model: 'fake-1', attempts: 1 });
+    const { post } = await start({ generate });
+    expect((await post({ transcript: TRANSCRIPT })).body.naturalPhrasing).toEqual([]);
+  });
+
   it('rejects answers under twenty words without calling the model', async () => {
     const generate = vi.fn();
     const { post } = await start({ generate });

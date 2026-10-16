@@ -10,6 +10,7 @@ import { TALK_TYPES } from '@/live/metrics/pace';
 import { requestFieldNotesWithRetry } from '@/session/fieldNotesApi';
 import { requestTightened } from '@/session/tightenApi';
 import { TightenedAnswer } from '@/components/notes/TightenedAnswer';
+import { NaturalPhrasing } from '@/components/notes/NaturalPhrasing';
 import { BeforeAfter } from '@/components/notes/BeforeAfter';
 import { TakeItWithYou } from '@/components/notes/TakeItWithYou';
 import { previousTake } from '@/lib/compare';
@@ -287,6 +288,8 @@ function FieldNotesView({
       {notes && session.segments.length >= MIN_WORDS && (
         <TightenedAnswer original={session.transcript.map((l) => l.text).join(' ')} tightened={session.tightened} pending={tightenPending} onRetry={onRetryTighten} />
       )}
+
+      {notes && <NaturalPhrasing items={notes.naturalPhrasing} open={session.config.situationId === 'english'} />}
 
       <section aria-labelledby="whole-h" className="flex flex-col gap-5">
         <div className="flex flex-wrap items-baseline justify-between gap-3">

@@ -35,6 +35,16 @@ export const DrillSchema = z.object({
   minutes: z.number().int().min(1).max(30),
 });
 
+/** "Say it more naturally": a line whose phrasing would sound non-native or unclear, and how to say it. */
+export const NaturalPhrasingSchema = z.object({
+  /** Verbatim from the transcript; checked like a note's quote. */
+  original: z.string().min(1),
+  /** How a native American English speaker would say it in this situation. */
+  natural: z.string().min(1),
+  /** One plain sentence. */
+  why: z.string().min(1),
+});
+
 export const FieldNotesSchema = z.object({
   verdict: z.string().min(1),
   /** The single most important change, as an instruction for the next take. */
@@ -67,5 +77,7 @@ export const FieldNotesSchema = z.object({
     reason: z.string().min(1),
   }),
   drills: z.array(DrillSchema).min(1),
+  /** Up to three lines to say more naturally; empty when none qualify. */
+  naturalPhrasing: z.array(NaturalPhrasingSchema).max(3).optional(),
 });
 

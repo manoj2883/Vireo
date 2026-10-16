@@ -154,6 +154,22 @@ describe('validation helpers', () => {
     expect(prompt).toContain('  1. a\n  2. b');
   });
 
+  it('accepts "say it more naturally" as absent, empty or up to three items', () => {
+    const item = { original: 'so much joyful', natural: 'really happy', why: 'Joyful describes a thing; for a feeling, say happy.' };
+    expect(validateReply(JSON.stringify(VALID)).data).toBeTruthy();
+    expect(validateReply(JSON.stringify({ ...VALID, naturalPhrasing: [] })).data).toBeTruthy();
+    expect(validateReply(JSON.stringify({ ...VALID, naturalPhrasing: [item, item, item] })).data).toBeTruthy();
+    expect(validateReply(JSON.stringify({ ...VALID, naturalPhrasing: [item, item, item, item] })).problem).toMatch(/naturalPhrasing/);
+    expect(validateReply(JSON.stringify({ ...VALID, naturalPhrasing: [{ ...item, natural: '' }] })).problem).toMatch(/naturalPhrasing/);
+  });
+
+  it('asks for natural phrasing quoted verbatim, keeping the meaning, or an empty array', () => {
+    expect(FIELD_NOTES_SYSTEM).toMatch(/naturalPhrasing: up to three lines/);
+    expect(FIELD_NOTES_SYSTEM).toMatch(/original is copied character for character from the transcript/);
+    expect(FIELD_NOTES_SYSTEM).toMatch(/never what they said/);
+    expect(FIELD_NOTES_SYSTEM).toMatch(/If no line qualifies, return an empty array/);
+  });
+
   it('rejects out-of-range scores', () => {
     expect(validateReply(JSON.stringify({ ...VALID, scores: { ...VALID.scores, delivery: 140 } })).problem).toMatch(/scores\.delivery/);
   });

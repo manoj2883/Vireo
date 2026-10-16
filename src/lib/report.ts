@@ -14,6 +14,8 @@ export interface ReportSpec {
   prompt: string;
   oneFix: { instruction: string; why: string } | null;
   tightened: string | null;
+  /** "Say it more naturally": what was said and how to say it. */
+  naturalPhrasing: { original: string; natural: string; why: string }[];
   /** Before and after on a retake; this take's numbers otherwise. */
   numbers: { label: string; before: string | null; after: string }[];
   fixResult: string | null;
@@ -48,6 +50,7 @@ export function buildReport(session: StoredSession, previous: StoredSession | nu
     prompt: session.config.prompt,
     oneFix: session.notes?.oneFix ?? null,
     tightened: session.tightened?.status === 'ready' ? session.tightened.script : null,
+    naturalPhrasing: (session.notes?.naturalPhrasing ?? []).slice(0, 3).map((p) => ({ original: p.original, natural: p.natural, why: p.why })),
     numbers,
     fixResult,
     drills: (session.notes?.drills ?? []).slice(0, 3).map((d) => ({ title: d.title, instructions: d.instructions, minutes: d.minutes })),
@@ -171,6 +174,16 @@ export async function makeReportPdf(spec: ReportSpec): Promise<jsPDF> {
   if (spec.tightened) {
     heading('Your answer, tightened (/ = pause)');
     text(spec.tightened, 11, { font: 'times', maxLines: 12 });
+  }
+
+  if (spec.naturalPhrasing.length) {
+    heading('Say it more naturally');
+    for (const p of spec.naturalPhrasing) {
+      if (y + 30 > bottom) break;
+      text(`You said: "${p.original}"`, 9.5, { color: MUTED, maxLines: 2, gap: 0 });
+      text(p.natural, 11, { font: 'times', maxLines: 2, gap: 0 });
+      text(p.why, 9, { color: MUTED, maxLines: 2, gap: 4 });
+    }
   }
 
   if (spec.drills.length) {
