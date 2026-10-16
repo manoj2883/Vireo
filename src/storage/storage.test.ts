@@ -108,8 +108,8 @@ describe('deleteAllData', () => {
   });
 
   it('includes the words Vireo should know', async () => {
-    await saveCustomTerms(['Manoj Kumar', 'LangGraph']);
-    expect(await getCustomTerms()).toEqual(['Manoj Kumar', 'LangGraph']);
+    await saveCustomTerms(['Jordan Lee', 'LangGraph']);
+    expect(await getCustomTerms()).toEqual(['Jordan Lee', 'LangGraph']);
     await deleteAllData();
     expect(await getCustomTerms()).toEqual([]);
   });
