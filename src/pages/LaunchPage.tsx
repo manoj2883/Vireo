@@ -16,7 +16,7 @@ const FEATURES = [
   { icon: BookOpen, tone: 'text-olive', title: 'Story Bank', body: 'Keep your best stories ready. Rehearse one and Vireo checks you hit its key points, not just how you sounded.' },
   { icon: Gauge, tone: 'text-sky', title: 'Ghost pace', body: 'A faint marker shows where you were on your best take, so every rehearsal is a race against yourself.' },
   { icon: PlayCircle, tone: 'text-sky', title: 'Notes on the moment', body: 'Every note is pinned to the second it’s about, with the exact words you said.' },
-  { icon: Lock, tone: 'text-amber', title: 'Private by design', body: 'Video is analysed live and never stored. Your sessions stay on your device until you delete them.' },
+  { icon: Lock, tone: 'text-amber', title: 'Private by design', body: 'Video is analysed live and never stored. Sessions are saved only on your device; your transcript is sent to write the field notes.' },
   { icon: Cpu, tone: 'text-amber', title: 'Your choice of model', body: 'Deepgram for live transcription with real word timings, and Gemini, Claude or any OpenRouter model for your notes.' },
 ];
 

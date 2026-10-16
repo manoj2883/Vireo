@@ -185,7 +185,12 @@ export async function makeReportPdf(spec: ReportSpec): Promise<jsPDF> {
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
   doc.setTextColor(...MUTED);
-  doc.text('Made on your device by Vireo, a field guide to your voice. Nothing was sent to a server to make this report.', M, H - 32);
+  // Matches the README's Privacy section: only the PDF itself is drawn locally.
+  const footer = doc.splitTextToSize(
+    'Made by Vireo, a field guide to your voice. This PDF was drawn on your device. Your transcript was sent to write the field notes; audio and video were not.',
+    W - M * 2,
+  ) as string[];
+  doc.text(footer, M, H - 32 - (footer.length - 1) * 10);
 
   if (spec.transcript) {
     doc.addPage();

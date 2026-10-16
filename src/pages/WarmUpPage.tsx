@@ -370,7 +370,7 @@ export function WarmUpPage() {
           </Button>
           {!canStart && <p className="m-0 text-small text-ink-muted">Write what you’re answering first.</p>}
           <p id={ids.privacy} className="m-0 text-small text-ink-muted">
-            Video is analysed on this device and never leaves it. Transcripts and notes stay on this device until you delete them.
+            Video is analysed on this device and never leaves it. Your audio goes to Deepgram to be transcribed, and your transcript goes to the field notes model. Sessions are saved only on this device until you delete them.
           </p>
         </aside>
       </div>
