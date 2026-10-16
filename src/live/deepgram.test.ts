@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DeepgramLiveClient, buildListenUrl, type SttSocket } from './deepgramLiveClient';
-import { buildKeyterms } from './keyterms';
+import { buildKeyterms, MAX_CUSTOM_TERM_CHARS, MAX_CUSTOM_TERMS, MAX_KEYTERMS, mergeKeyterms, parseCustomTerms } from './keyterms';
 
 function fakeSocket() {
   const sent: unknown[] = [];
@@ -170,5 +170,30 @@ describe('buildKeyterms', () => {
 
   it('is empty for an empty prompt', () => {
     expect(buildKeyterms({})).toEqual([]);
+  });
+});
+
+describe('words Vireo should know', () => {
+  it('trims, de-duplicates and caps the user’s terms', () => {
+    expect(parseCustomTerms(' Manoj Kumar,Blooming   Clouds,, LangGraph, manoj kumar ,')).toEqual(['Manoj Kumar', 'Blooming Clouds', 'LangGraph']);
+    expect(parseCustomTerms('')).toEqual([]);
+    expect(parseCustomTerms(Array.from({ length: 30 }, (_, i) => `term${i}`).join(','))).toHaveLength(MAX_CUSTOM_TERMS);
+    expect(parseCustomTerms('x'.repeat(200))[0]).toHaveLength(MAX_CUSTOM_TERM_CHARS);
+  });
+
+  it('puts the user’s terms ahead of the built-in ones, without repeats, within the limit', () => {
+    const builtIn = buildKeyterms({ prompt: 'How does LangGraph help DiabEvidence?' });
+    const merged = mergeKeyterms(['Manoj Kumar', 'Blooming Clouds', 'langgraph'], builtIn);
+    expect(merged.slice(0, 3)).toEqual(['Manoj Kumar', 'Blooming Clouds', 'langgraph']);
+    expect(merged.filter((t) => t.toLowerCase() === 'langgraph')).toHaveLength(1);
+    expect(merged).toContain('DiabEvidence');
+    const many = mergeKeyterms(Array.from({ length: 20 }, (_, i) => `mine${i}`), Array.from({ length: 40 }, (_, i) => `built${i}`));
+    expect(many).toHaveLength(MAX_KEYTERMS);
+    expect(many.slice(0, 20)).toEqual(Array.from({ length: 20 }, (_, i) => `mine${i}`));
+  });
+
+  it('sends the merged terms to Deepgram', () => {
+    const url = new URL(buildListenUrl(mergeKeyterms(['Manoj Kumar'], ['DiabEvidence'])));
+    expect(url.searchParams.getAll('keyterm')).toEqual(['Manoj Kumar', 'DiabEvidence']);
   });
 });

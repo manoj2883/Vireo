@@ -99,7 +99,7 @@ Vireo measures as much as it can on your device, and is explicit about what it s
 
 | What | When | Goes to |
 | :--- | :--- | :--- |
-| Microphone audio (16 kHz) | During a live session | **Deepgram**, directly from your browser, for transcription. The server only issues the short-lived token that opens the connection. |
+| Microphone audio (16 kHz), plus keyterms: distinctive words from your question and story, and your "Words Vireo should know" | During a live session | **Deepgram**, directly from your browser, for transcription. The server only issues the short-lived token that opens the connection. |
 | Transcript text and timestamps, your prompt, situation, pace zone, on-device metrics, camera events (not images) and the chosen Story Bank outline | When field notes and the tightened answer are written | The Vireo server, which sends it to the provider in `LLM_PROVIDER` (and `LLM_FALLBACKS` if that one is busy): **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model you choose). |
 | An anonymous random cookie and your IP address | When a session starts and when notes are written | The Vireo server, only to apply usage limits. Counters are kept in **Upstash Redis** when it's configured. |
 

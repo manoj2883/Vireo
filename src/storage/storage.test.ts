@@ -4,6 +4,7 @@ import { openDB } from 'idb';
 import {
   deleteAllData,
   deleteSession,
+  getCustomTerms,
   getGhost,
   getSession,
   getStory,
@@ -11,6 +12,7 @@ import {
   listStories,
   putGhost,
   resetLocalDbConnection,
+  saveCustomTerms,
   saveSession,
   saveStory,
   sessionFromResult,
@@ -103,6 +105,13 @@ describe('deleteAllData', () => {
     expect(localStorage.getItem('vireo-theme')).toBe('light');
     // The app keeps working afterwards with a fresh, empty database.
     expect(await listSessions()).toEqual([]);
+  });
+
+  it('includes the words Vireo should know', async () => {
+    await saveCustomTerms(['Manoj Kumar', 'LangGraph']);
+    expect(await getCustomTerms()).toEqual(['Manoj Kumar', 'LangGraph']);
+    await deleteAllData();
+    expect(await getCustomTerms()).toEqual([]);
   });
 });
 

@@ -4,7 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { IDBFactory } from 'fake-indexeddb';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { AppRoutes } from '@/routes';
-import { getSession, listStories, resetLocalDbConnection, saveSession, saveStory, type StoredSession } from '@/storage/localDb';
+import { getCustomTerms, getSession, listStories, resetLocalDbConnection, saveSession, saveStory, type StoredSession } from '@/storage/localDb';
 import { saveConfig } from '@/session/config';
 import { fieldNotesRetry } from '@/session/fieldNotesApi';
 import { PaceBand } from '@/components/hud/PaceBand';
@@ -340,6 +340,18 @@ describe('Home', () => {
     expect(screen.getByRole('heading', { name: /your last 2 sessions, drawn/i })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /2\.1 fillers a minute\. open field notes/i })).toHaveAttribute('href', '/notes/b');
     expect(screen.getByText('Follow-up question waiting')).toBeInTheDocument();
+  });
+
+  it('saves the words Vireo should know on this device', async () => {
+    renderAt('/app');
+    const section = await screen.findByRole('region', { name: 'Words Vireo should know' });
+    const input = within(section).getByRole('textbox');
+    await waitFor(() => expect(input).toHaveValue(''));
+    fireEvent.change(input, { target: { value: 'Manoj Kumar,  Blooming Clouds, LangGraph, langgraph' } });
+    fireEvent.click(within(section).getByRole('button', { name: 'Save words' }));
+    expect(await within(section).findByRole('status')).toHaveTextContent('Saved 3 words.');
+    expect(input).toHaveValue('Manoj Kumar, Blooming Clouds, LangGraph');
+    expect(await getCustomTerms()).toEqual(['Manoj Kumar', 'Blooming Clouds', 'LangGraph']);
   });
 });
 

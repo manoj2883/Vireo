@@ -62,10 +62,14 @@ export interface VireoLocalDB extends DBSchema {
   ghosts: { key: string; value: PaceTake };
   sessions: { key: string; value: StoredSession; indexes: { 'by-createdAt': string } };
   stories: { key: string; value: StoredStory; indexes: { 'by-kind': StoryKind } };
+  settings: { key: string; value: StoredSetting };
 }
 
+/** A per-user setting, kept on this device. */
+export type StoredSetting = { key: 'customTerms'; value: string[] };
+
 export const LOCAL_DB_NAME = 'vireo-local';
-export const LOCAL_DB_VERSION = 2;
+export const LOCAL_DB_VERSION = 3;
 
 let dbPromise: Promise<IDBPDatabase<VireoLocalDB>> | null = null;
 
@@ -81,6 +85,9 @@ export function getLocalDb(): Promise<IDBPDatabase<VireoLocalDB>> {
           sessions.createIndex('by-createdAt', 'createdAt');
           const stories = db.createObjectStore('stories', { keyPath: 'id' });
           stories.createIndex('by-kind', 'kind');
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('settings', { keyPath: 'key' });
         }
       },
     });
@@ -171,6 +178,17 @@ export async function deleteStory(id: string): Promise<void> {
   await (await getLocalDb()).delete('stories', id);
 }
 
+// ---------- settings ----------
+
+/** "Words Vireo should know": the user's name, company and terms, sent to the transcriber as keyterms. */
+export async function getCustomTerms(): Promise<string[]> {
+  return (await (await getLocalDb()).get('settings', 'customTerms'))?.value ?? [];
+}
+
+export async function saveCustomTerms(terms: string[]): Promise<void> {
+  await (await getLocalDb()).put('settings', { key: 'customTerms', value: terms });
+}
+
 // ---------- deleting ----------
 
 /**
@@ -196,7 +214,8 @@ const LOCAL_KEYS = ['vireo-legacy-imported'];
 
 /**
  * Delete everything Vireo keeps on this device: sessions, notes, the Story Bank, ghost pace,
- * the previous version's database and the remembered warm-up. The theme preference stays.
+ * settings (including the words Vireo should know), the previous version's database and the
+ * remembered warm-up. The theme preference stays.
  */
 export async function deleteAllData(): Promise<void> {
   if (dbPromise) {
