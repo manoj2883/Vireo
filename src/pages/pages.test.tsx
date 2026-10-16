@@ -572,14 +572,23 @@ describe('Take it with you', () => {
     renderAt('/notes/sess_1');
     const section = await screen.findByRole('region', { name: 'Take it with you' });
     expect(within(section).getByRole('checkbox', { name: /include my words/i })).not.toBeChecked();
-    expect(within(section).getByRole('button', { name: 'Add 3 reminders to my calendar' })).toBeDisabled();
+    expect(within(section).getByRole('button', { name: 'Apple Calendar / Outlook desktop (.ics)' })).toBeDisabled();
+    expect(within(section).queryByRole('list', { name: 'Google Calendar reminders' })).toBeNull();
 
     const inTen = new Date();
     inTen.setDate(inTen.getDate() + 10);
     const day = `${inTen.getFullYear()}-${String(inTen.getMonth() + 1).padStart(2, '0')}-${String(inTen.getDate()).padStart(2, '0')}`;
     fireEvent.change(within(section).getByLabelText(/when is the real interview/i), { target: { value: day } });
-    expect(within(section).getAllByRole('listitem')).toHaveLength(3);
-    expect(within(section).getByRole('button', { name: 'Add 3 reminders to my calendar' })).toBeEnabled();
+    expect(within(within(section).getByRole('list', { name: 'Rehearsal days' })).getAllByRole('listitem')).toHaveLength(3);
+    expect(within(section).getByRole('button', { name: 'Apple Calendar / Outlook desktop (.ics)' })).toBeEnabled();
+    for (const name of ['Google Calendar reminders', 'Outlook.com reminders']) {
+      const links = within(within(section).getByRole('list', { name })).getAllByRole('link');
+      expect(links).toHaveLength(3);
+      for (const a of links) {
+        expect(a).toHaveAttribute('target', '_blank');
+        expect(a).toHaveAttribute('rel', 'noopener noreferrer');
+      }
+    }
   });
 
   it('explains a date that is too soon', async () => {

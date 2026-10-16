@@ -1,6 +1,6 @@
 /**
  * "Practise again before it matters": three rehearsal reminders spread before the real date, as an
- * .ics file. Each links back to /warm-up with the same prompt and that day's drill; never the
+ * .ics file or as Google Calendar and Outlook.com links. Each links back to /warm-up with the same prompt and that day's drill; never the
  * transcript. No email address is collected.
  */
 
@@ -86,24 +86,79 @@ export function foldLine(line: string): string {
 const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
 const compact = (day: string) => day.replace(/-/g, '');
 
-export function buildIcs(input: ReminderInput): string {
-  const days = rehearsalDays(input.today, input.eventDay);
-  const now = input.now ?? new Date();
+/** Every reminder is 6:00 to 6:20 pm, in the user's local time. */
+const START_TIME = '18:00:00';
+const END_TIME = '18:20:00';
+
+/** One rehearsal, shared by the .ics file and the Google and Outlook links so they always agree. */
+export interface ReminderEvent {
+  day: string;
+  drill: string | undefined;
+  title: string;
+  description: string;
+  link: string;
+  /** "Sat 17 Oct — First-Sentence Landing" */
+  label: string;
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "Sat 17 Oct" for "2026-10-17". */
+export function shortDay(day: string): string {
+  const [y, m, d] = day.split('-').map(Number);
+  return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d} ${MONTHS[m - 1]}`;
+}
+
+export function reminderEvents(input: ReminderInput): ReminderEvent[] {
   const shortPrompt = input.prompt.length > 60 ? `${input.prompt.slice(0, 57)}...` : input.prompt;
-  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Vireo//Rehearsal reminders//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
-  days.forEach((day, i) => {
+  return rehearsalDays(input.today, input.eventDay).map((day, i) => {
     const drill = input.drills.length ? input.drills[i % input.drills.length] : undefined;
     const link = warmUpLink(input.origin, input.prompt, input.situationId, drill);
     const left = daysBetween(day, input.eventDay);
     const description = [`Rehearsal ${i + 1} of 3, ${left} ${left === 1 ? 'day' : 'days'} before the real thing.`, drill ? `Today's drill: ${drill}` : '', `Open Vireo: ${link}`].filter(Boolean).join('\n');
+    return { day, drill, title: `Vireo rehearsal: ${shortPrompt}`, description, link, label: `${shortDay(day)} — ${drill ?? `Rehearsal ${i + 1}`}` };
+  });
+}
+
+/** Google Calendar "new event" links, one per rehearsal. No `Z` on the dates, so they stay local time like the .ics. */
+export function googleCalendarLinks(input: ReminderInput): { label: string; href: string }[] {
+  return reminderEvents(input).map((e) => {
+    const at = (time: string) => `${compact(e.day)}T${time.replace(/:/g, '')}`;
+    const q = `action=TEMPLATE&text=${encodeURIComponent(e.title)}&dates=${at(START_TIME)}/${at(END_TIME)}&details=${encodeURIComponent(e.description)}`;
+    return { label: e.label, href: `https://calendar.google.com/calendar/render?${q}` };
+  });
+}
+
+/** Outlook.com "new event" links, one per rehearsal, with ISO local date-times. */
+export function outlookLinks(input: ReminderInput): { label: string; href: string }[] {
+  return reminderEvents(input).map((e) => {
+    // encodeURIComponent, not URLSearchParams: spaces as %20, since a "+" is not always read as a space.
+    const params: [string, string][] = [
+      ['path', '/calendar/action/compose'],
+      ['rru', 'addevent'],
+      ['subject', e.title],
+      ['startdt', `${e.day}T${START_TIME}`],
+      ['enddt', `${e.day}T${END_TIME}`],
+      ['body', e.description],
+    ];
+    const q = params.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
+    return { label: e.label, href: `https://outlook.live.com/calendar/0/deeplink/compose?${q}` };
+  });
+}
+
+export function buildIcs(input: ReminderInput): string {
+  const now = input.now ?? new Date();
+  const lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Vireo//Rehearsal reminders//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH'];
+  reminderEvents(input).forEach(({ day, title, description, link }, i) => {
     lines.push(
       'BEGIN:VEVENT',
       `UID:vireo-${compact(input.eventDay)}-${i + 1}-${stamp(now)}@vireo`,
       `DTSTAMP:${stamp(now)}`,
       // Floating local time: 6 pm wherever they are.
-      `DTSTART:${compact(day)}T180000`,
-      `DTEND:${compact(day)}T182000`,
-      `SUMMARY:${icsEscape(`Vireo rehearsal: ${shortPrompt}`)}`,
+      `DTSTART:${compact(day)}T${START_TIME.replace(/:/g, '')}`,
+      `DTEND:${compact(day)}T${END_TIME.replace(/:/g, '')}`,
+      `SUMMARY:${icsEscape(title)}`,
       `DESCRIPTION:${icsEscape(description)}`,
       `URL:${link}`,
       'BEGIN:VALARM',
