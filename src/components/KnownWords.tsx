@@ -5,7 +5,7 @@ import { getCustomTerms, saveCustomTerms } from '@/storage/localDb';
 
 /**
  * "Words Vireo should know": the user's name, company and technical terms, sent to the transcriber
- * as keyterms ahead of the built-in ones, so "Manoj Kumar" isn't heard as "Monash Kumar".
+ * as keyterms ahead of the built-in ones, so names the transcriber doesn’t know are spelled right.
  */
 export function KnownWords() {
   const [text, setText] = useState('');
@@ -50,7 +50,7 @@ export function KnownWords() {
         type="text"
         aria-describedby={helpId}
         className="min-h-12 w-full max-w-[720px] rounded-md border border-line bg-surface-100 px-4 text-body text-foreground"
-        placeholder="Manoj Kumar, Blooming Clouds, LangGraph"
+        placeholder="Jordan Lee, Acme Robotics, LangGraph"
         value={text}
         onChange={(e) => {
           setText(e.target.value);

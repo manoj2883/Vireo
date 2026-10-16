@@ -175,7 +175,7 @@ describe('buildKeyterms', () => {
 
 describe('words Vireo should know', () => {
   it('trims, de-duplicates and caps the user’s terms', () => {
-    expect(parseCustomTerms(' Manoj Kumar,Blooming   Clouds,, LangGraph, manoj kumar ,')).toEqual(['Manoj Kumar', 'Blooming Clouds', 'LangGraph']);
+    expect(parseCustomTerms(' Jordan Lee,Acme   Robotics,, LangGraph, jordan lee ,')).toEqual(['Jordan Lee', 'Acme Robotics', 'LangGraph']);
     expect(parseCustomTerms('')).toEqual([]);
     expect(parseCustomTerms(Array.from({ length: 30 }, (_, i) => `term${i}`).join(','))).toHaveLength(MAX_CUSTOM_TERMS);
     expect(parseCustomTerms('x'.repeat(200))[0]).toHaveLength(MAX_CUSTOM_TERM_CHARS);
@@ -183,8 +183,8 @@ describe('words Vireo should know', () => {
 
   it('puts the user’s terms ahead of the built-in ones, without repeats, within the limit', () => {
     const builtIn = buildKeyterms({ prompt: 'How does LangGraph help DiabEvidence?' });
-    const merged = mergeKeyterms(['Manoj Kumar', 'Blooming Clouds', 'langgraph'], builtIn);
-    expect(merged.slice(0, 3)).toEqual(['Manoj Kumar', 'Blooming Clouds', 'langgraph']);
+    const merged = mergeKeyterms(['Jordan Lee', 'Acme Robotics', 'langgraph'], builtIn);
+    expect(merged.slice(0, 3)).toEqual(['Jordan Lee', 'Acme Robotics', 'langgraph']);
     expect(merged.filter((t) => t.toLowerCase() === 'langgraph')).toHaveLength(1);
     expect(merged).toContain('DiabEvidence');
     const many = mergeKeyterms(Array.from({ length: 20 }, (_, i) => `mine${i}`), Array.from({ length: 40 }, (_, i) => `built${i}`));
@@ -193,7 +193,7 @@ describe('words Vireo should know', () => {
   });
 
   it('sends the merged terms to Deepgram', () => {
-    const url = new URL(buildListenUrl(mergeKeyterms(['Manoj Kumar'], ['DiabEvidence'])));
-    expect(url.searchParams.getAll('keyterm')).toEqual(['Manoj Kumar', 'DiabEvidence']);
+    const url = new URL(buildListenUrl(mergeKeyterms(['Jordan Lee'], ['DiabEvidence'])));
+    expect(url.searchParams.getAll('keyterm')).toEqual(['Jordan Lee', 'DiabEvidence']);
   });
 });

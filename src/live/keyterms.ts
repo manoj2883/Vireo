@@ -23,7 +23,7 @@ export const MAX_CUSTOM_TERM_CHARS = 60;
  */
 export const MAX_KEYTERMS = 50;
 
-/** "Manoj Kumar, Blooming Clouds,  LangGraph" → trimmed, de-duplicated terms, up to MAX_CUSTOM_TERMS. */
+/** "Jordan Lee, Acme Robotics,  LangGraph" → trimmed, de-duplicated terms, up to MAX_CUSTOM_TERMS. */
 export function parseCustomTerms(text: string): string[] {
   const out: string[] = [];
   const seen = new Set<string>();

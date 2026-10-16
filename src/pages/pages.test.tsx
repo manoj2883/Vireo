@@ -390,11 +390,11 @@ describe('Home', () => {
     const section = await screen.findByRole('region', { name: 'Words Vireo should know' });
     const input = within(section).getByRole('textbox');
     await waitFor(() => expect(input).toHaveValue(''));
-    fireEvent.change(input, { target: { value: 'Manoj Kumar,  Blooming Clouds, LangGraph, langgraph' } });
+    fireEvent.change(input, { target: { value: 'Jordan Lee,  Acme Robotics, LangGraph, langgraph' } });
     fireEvent.click(within(section).getByRole('button', { name: 'Save words' }));
     expect(await within(section).findByRole('status')).toHaveTextContent('Saved 3 words.');
-    expect(input).toHaveValue('Manoj Kumar, Blooming Clouds, LangGraph');
-    expect(await getCustomTerms()).toEqual(['Manoj Kumar', 'Blooming Clouds', 'LangGraph']);
+    expect(input).toHaveValue('Jordan Lee, Acme Robotics, LangGraph');
+    expect(await getCustomTerms()).toEqual(['Jordan Lee', 'Acme Robotics', 'LangGraph']);
   });
 });
 
