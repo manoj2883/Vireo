@@ -369,6 +369,38 @@ describe('Deleting', () => {
   });
 });
 
+describe('Trust page', () => {
+  it('is linked from the launch footer and Home', async () => {
+    const { unmount } = renderAt('/');
+    expect(screen.getByRole('link', { name: 'Trust and privacy' })).toHaveAttribute('href', '/trust');
+    unmount();
+    renderAt('/app');
+    expect(await screen.findByRole('link', { name: /everything that leaves this device/i })).toHaveAttribute('href', '/trust');
+  });
+
+  it('lists what stays, every data flow, what Vireo never does, and unpublished accuracy honestly', () => {
+    renderAt('/trust');
+    expect(screen.getByRole('heading', { level: 1, name: 'What happens to your voice' })).toBeInTheDocument();
+    const leaves = screen.getByRole('region', { name: 'Leaves this device' });
+    for (const name of ['Deepgram', 'Google Gemini', 'Upstash Redis', 'Vercel', 'Google Fonts', 'jsDelivr']) expect(within(leaves).getByText(name)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Vireo never' })).toHaveTextContent(/never what you felt/);
+    expect(screen.getByRole('region', { name: 'Current accuracy' })).toHaveTextContent(/Not published yet.*at least 10 real recordings/);
+    expect(screen.getByRole('link', { name: 'MIT licence' })).toHaveAttribute('href', 'https://github.com/manoj2883/Vireo/blob/main/LICENSE');
+    expect(screen.getByRole('link', { name: 'run it yourself' })).toHaveAttribute('href', 'https://github.com/manoj2883/Vireo#local-setup');
+  });
+
+  it('deletes all data', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
+    renderAt('/trust');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all data' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete everything' }));
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent('Everything Vireo kept on this device is gone.');
+    expect(await getSession('sess_1')).toBeUndefined();
+  });
+});
+
 describe('Home', () => {
   it('builds the headline and numbers from real sessions', async () => {
     const day = 86_400_000;

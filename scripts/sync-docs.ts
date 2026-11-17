@@ -1,6 +1,6 @@
 /**
  * Regenerates the docs that share a source file with the app, so they can't drift:
- * docs/scoring.md (from src/lib/scoreExplanations.ts). A test fails when they're out of date.
+ * docs/scoring.md (from src/lib/scoreExplanations.ts) and the README privacy lists (from src/data/dataFlows.ts). A test fails when they're out of date.
  * Usage: npm run docs
  */
 import fs from 'fs';

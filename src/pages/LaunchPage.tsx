@@ -170,6 +170,9 @@ export function LaunchPage() {
       <footer className="mx-auto flex max-w-container flex-wrap justify-between gap-4 border-t border-line px-4 py-8 text-small text-ink-muted sm:px-8">
         <span>Open source under the MIT licence.</span>
         <span className="flex gap-5">
+          <Link to="/trust" className="rounded-sm hover:text-ink">
+            Trust and privacy
+          </Link>
           <a href="https://github.com/manoj2883" className="rounded-sm hover:text-ink">
             GitHub
           </a>

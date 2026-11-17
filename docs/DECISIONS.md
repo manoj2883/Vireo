@@ -23,3 +23,7 @@ Product decisions the build spec didn't cover, with the reasoning. Newest at the
 **D9. Two fix verdicts, labelled apart.** Before and after keeps the model's quote-based verdict on the fix, now worded "The notes heard it in your words" / "The notes didn't hear it yet", above the measured "Fix adopted ✓" line, so the two can't be mistaken for one claim.
 
 **D10. Generated docs are checked by a test.** `docs/scoring.md` is rendered from `src/lib/scoreExplanations.ts` by `npm run docs` (and by `eval --report`, since it quotes accuracy). A test fails when it's out of date.
+
+**D11. The data-flow table now lists hosting and downloads.** Building the trust page showed two flows the README never mentioned: Vercel's standard request logs, and the page asking Google Fonts for the typefaces. Both are now rows in `src/data/dataFlows.ts`. Self-hosting the fonts would remove the Google Fonts row; that's left as a choice for the owner.
+
+**D12. "Never infers emotion" names expression.** The camera reports smiling as a share of time. That's an observable expression, not a feeling, so the "Vireo never" list names visible expression among the observable signals and says it never reports what you felt.

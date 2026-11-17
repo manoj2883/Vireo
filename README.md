@@ -89,21 +89,35 @@ flowchart LR
 
 Vireo measures as much as it can on your device, and is explicit about what it sends where.
 
+The same lists are in the app, on the [trust page](https://vireo-amber.vercel.app/trust), generated from one file: `src/data/dataFlows.ts`.
+
+<!-- privacy:start -->
 **Stays on your device**
 
-- **Video is never recorded, stored or uploaded.** The camera is analysed in the browser with MediaPipe; only timed events (like "looked away from 0:41 to 0:45") are kept, on this device.
-- Pauses, pace, fillers, pitch and loudness are computed in the browser.
-- Sessions (transcript, sonogram, metrics, field notes), your Story Bank and ghost pace are stored in this browser's IndexedDB. Nothing is kept on the server.
+- Video is never recorded, stored or uploaded. The camera is analysed in your browser with MediaPipe; only timed events, like “looked away from 0:41 to 0:45”, are kept, on this device.
+- Pauses, pace, fillers, pitch and loudness are measured in your browser.
+- Sessions (transcript, sonogram, metrics, field notes), your Story Bank, ghost pace, fix adoption and settings are stored in this browser’s IndexedDB. Nothing is kept on a server.
+- The share card and PDF report are drawn in your browser. The share card leaves out your words unless you tick “Include my words”.
 
 **Leaves your device**
 
 | What | When | Goes to |
 | :--- | :--- | :--- |
-| Microphone audio (16 kHz), plus keyterms: distinctive words from your question and story, and your "Words Vireo should know" | During a live session | **Deepgram**, directly from your browser, for transcription. The server only issues the short-lived token that opens the connection. |
-| Transcript text and timestamps, your prompt, situation, pace zone, on-device metrics, camera events (not images) and the chosen Story Bank outline | When field notes and the tightened answer are written | The Vireo server, which sends it to the provider in `LLM_PROVIDER` (and `LLM_FALLBACKS` if that one is busy): **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model you choose). |
-| An anonymous random cookie and your IP address | When a session starts and when notes are written | The Vireo server, only to apply usage limits. Counters are kept in **Upstash Redis** when it's configured. |
+| Microphone audio (16 kHz), plus keyterms: distinctive words from your question and story, and your “Words Vireo should know” | During a live session | **Deepgram**, directly from your browser, for transcription. The Vireo server only issues the short-lived token that opens the connection. |
+| Transcript text and timestamps, your prompt, situation, pace zone, on-device metrics, camera events (not images) and the chosen Story Bank outline | When field notes and the tightened answer are written | The Vireo server, which sends it to the provider in `LLM_PROVIDER` (and `LLM_FALLBACKS` if that one is busy): **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model chosen). |
+| An anonymous random cookie and your IP address | When a session starts and when notes are written | The Vireo server, only to apply usage limits. Counters are kept in **Upstash Redis** when it’s configured. |
+| Ordinary web requests (your IP address, browser and the page asked for) | Whenever you load Vireo | **Vercel**, which hosts the public site and keeps standard request logs. A self-hosted copy uses your own server instead. |
+| Requests for the fonts and the on-device camera models (your IP address and browser; no session data) | When a page loads, and when the camera is first used | **Google Fonts** for the typefaces; **Google’s model storage** and **jsDelivr** for the MediaPipe camera models. No frames or audio are sent. |
 
-The camera models are downloaded from Google's model storage and jsDelivr when a session starts; no frames are sent anywhere. The server stores no session data and writes no transcript text to its logs, only counts and errors. The share card and PDF report are drawn in your browser, and the share card never includes your transcript.
+**Vireo never**
+
+- Record, store or upload your video.
+- Keep your audio. It streams to Deepgram for transcription and Vireo never saves it.
+- Keep your sessions, transcripts or notes on a server. There are no accounts and no server database.
+- Guess or label your emotions. Vireo only reports what it can observe: pace, pauses, fillers, pitch range, loudness, gaze direction, posture and visible expression (such as smiling), never what you felt.
+- Write your transcript text to its server logs. Only counts and errors are logged.
+- Show a note it can’t back with your exact words.
+<!-- privacy:end -->
 
 Each provider handles what it receives under its own terms. Check them for the account and tier you use: some free tiers let the provider use submitted content to improve its products.
 
