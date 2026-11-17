@@ -61,3 +61,11 @@ Product decisions the build spec didn't cover, with the reasoning. Newest at the
 **D26. Phrasing categories: the classifier wins when it's sure.** Article, preposition, tense, plural and word-order changes are clear from the words alone; then the classifier's answer beats the model's label. Otherwise the model's `category` is used. A pattern must appear at least twice to show. It lives on Home under "Speaking English with confidence", the situation's own name, because the app has no separate view for it.
 
 **D27. Confidence mode details.** Breathing is 4 s in and 6 s out for 60 s, skippable. "Camera-off first take" means the camera is never opened on a take that isn't a retake; retakes in confidence mode use the camera as normal. The HUD keeps the pause ring and, for timed pitches, the countdown (it's the limit, not feedback). Live captions and the rushing glow are hidden. Coach mode's spoken nudges follow the user's own coaching choice.
+
+## Phase 4
+
+**D28. Reminder drills are resolved when the link opens.** A calendar event can't know which skill will be weakest on the day, so rehearsal links carry `drill=auto` and the warm-up asks the weekly-plan logic for the weakest skill's drill from this device's sessions. The description names last time's drill as a fallback. The final rehearsal's link carries `final=1`, which sets `takeQuestions` so the field notes lead with the Q&A drill.
+
+**D29. Uploads use Deepgram's pre-recorded API with a temporary token.** Deepgram's docs say temporary tokens work for pre-recorded `/listen` requests, so the browser decodes the file, encodes a 16 kHz mono WAV (about 29 MB for 15 minutes) and posts it straight to Deepgram. The Vercel function only grants the token, which counts as one session against the usage limits. Not yet tried from a real browser: if Deepgram's CORS refused it, the fallback would be streaming the decoded audio through the live socket.
+
+**D30. Uploads don't set ghost pace.** An uploaded talk is a real event, not a rehearsal of a question, so it doesn't replace the best take that ghost pace replays.

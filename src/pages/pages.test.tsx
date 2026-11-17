@@ -12,6 +12,12 @@ import { LiveCaptions } from '@/components/hud/LiveCaptions';
 import { EyeContactDot } from '@/components/hud/EyeContactDot';
 import type { FieldNotes } from '@/types/fieldNotes';
 
+// Decoding needs a real browser audio stack; the upload test supplies four seconds of quiet audio.
+vi.mock('@/upload/recording', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/upload/recording')>()),
+  decodeToMono16k: vi.fn(async () => new Float32Array(16_000 * 4)),
+}));
+
 function renderAt(path: string, state?: unknown) {
   return render(
     <ThemeProvider>
@@ -393,6 +399,28 @@ describe('Deleting', () => {
     });
     expect(await screen.findByRole('heading', { level: 1, name: 'Your first session starts here.' })).toBeInTheDocument();
     expect(await getSession('sess_1')).toBeUndefined();
+  });
+});
+
+describe('Upload a real talk', () => {
+  it('transcribes the audio with Deepgram directly, saves it as a session, and labels it from a recording', async () => {
+    const words = Array.from({ length: 24 }, (_, i) => ({ word: 'word', punctuated_word: i === 23 ? 'word.' : 'word', start: 0.1 + i * 0.15, end: 0.2 + i * 0.15 }));
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url) => {
+      const u = String(url);
+      const body = u === '/api/stt-token' ? { token: 'jwt' } : u.startsWith('https://api.deepgram.com/v1/listen') ? { results: { channels: [{ alternatives: [{ words }] }] } } : u === '/api/field-notes' ? NOTES : {};
+      return { ok: true, status: 200, json: async () => body } as Response;
+    });
+    renderAt('/upload');
+    expect(screen.getByText(/video stays on this device/i)).toBeInTheDocument();
+    const file = new File([new Uint8Array(8)], 'my-talk.mp4', { type: 'video/mp4' });
+    fireEvent.change(screen.getByLabelText('Audio or video file'), { target: { files: [file] } });
+    fireEvent.click(screen.getByRole('button', { name: 'Analyse this recording' }));
+    expect(await screen.findByTestId('from-recording')).toHaveTextContent('From a recording');
+    const urls = spy.mock.calls.map((c) => String(c[0]));
+    expect(urls).toContain('/api/stt-token');
+    // The audio never goes through the Vireo server.
+    const serverCalls = spy.mock.calls.filter((c) => String(c[0]).startsWith('/api'));
+    expect(serverCalls.every((c) => !((c[1] as RequestInit | undefined)?.body instanceof Blob))).toBe(true);
   });
 });
 

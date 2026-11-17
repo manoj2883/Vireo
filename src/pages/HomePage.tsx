@@ -235,6 +235,18 @@ export function HomePage() {
         )}
       </section>
 
+      <section aria-labelledby="upload-h" className="flex flex-wrap items-center justify-between gap-6 border-t border-line pt-10">
+        <div className="flex max-w-[640px] flex-col gap-2">
+          <h2 id="upload-h" className="m-0 text-heading">
+            Already gave the talk?
+          </h2>
+          <p className="m-0 text-body text-ink-muted">Upload a recording, audio or video, and get the same drawing and field notes. Video stays on this device.</p>
+        </div>
+        <Button asChild variant="outline">
+          <Link to="/upload">Upload a recording</Link>
+        </Button>
+      </section>
+
       <KnownWords key={wordsKey} />
 
       <section aria-labelledby="data-h" className="flex flex-col gap-4 border-t border-line pt-10">

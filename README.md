@@ -103,7 +103,7 @@ The same lists are in the app, on the [trust page](https://vireo-amber.vercel.ap
 
 | What | When | Goes to |
 | :--- | :--- | :--- |
-| Microphone audio (16 kHz), plus keyterms: distinctive words from your question and story, and your “Words Vireo should know” | During a live session | **Deepgram**, directly from your browser, for transcription. The Vireo server only issues the short-lived token that opens the connection. |
+| Microphone audio (16 kHz), plus keyterms: distinctive words from your question and story, and your “Words Vireo should know” | During a live session, and when you upload a recording (its audio only, taken out of the file on this device) | **Deepgram**, directly from your browser, for transcription. The Vireo server only issues the short-lived token that opens the connection. An uploaded video file never leaves this device. |
 | Transcript text and timestamps, your prompt, situation, pace zone, on-device metrics, camera events (not images) and the chosen Story Bank outline | When field notes and the tightened answer are written | The Vireo server, which sends it to the provider in `LLM_PROVIDER` (and `LLM_FALLBACKS` if that one is busy): **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model chosen). |
 | Your answers in the Story Bank interview, and the story’s working title | When you use “Build a story with me”, one answer at a time | The Vireo server, which sends them to the same field notes provider. The finished story is saved only on this device. |
 | An anonymous random cookie and your IP address | When a session starts and when notes are written | The Vireo server, only to apply usage limits. Counters are kept in **Upstash Redis** when it’s configured. |

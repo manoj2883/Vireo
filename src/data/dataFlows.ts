@@ -22,8 +22,8 @@ export const DATA_FLOWS: DataFlow[] = [
   {
     id: 'transcription',
     what: 'Microphone audio (16 kHz), plus keyterms: distinctive words from your question and story, and your “Words Vireo should know”',
-    when: 'During a live session',
-    goesTo: '**Deepgram**, directly from your browser, for transcription. The Vireo server only issues the short-lived token that opens the connection.',
+    when: 'During a live session, and when you upload a recording (its audio only, taken out of the file on this device)',
+    goesTo: '**Deepgram**, directly from your browser, for transcription. The Vireo server only issues the short-lived token that opens the connection. An uploaded video file never leaves this device.',
   },
   {
     id: 'field-notes',

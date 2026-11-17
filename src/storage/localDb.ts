@@ -37,6 +37,8 @@ export interface StoredSession {
   camera?: CameraResult | null;
   /** Retakes of the same question form a series; this is the first take's id. */
   retakeOf?: string;
+  /** Where the audio came from: a live session (the default) or an uploaded recording. */
+  source?: 'live' | 'recording';
   /** "Your answer, tightened": the rewrite of what was said, checked against the transcript. */
   tightened?: { script: string; mainPoint: string; status: 'ready' | 'failed'; error?: string };
 }

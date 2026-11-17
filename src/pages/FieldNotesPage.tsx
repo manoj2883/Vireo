@@ -272,7 +272,12 @@ function FieldNotesView({
 
       <section className="flex flex-col gap-7">
         <p className="m-0 text-ink-muted">
-          Field notes for your {talk.label.toLowerCase()}, recorded {longDate(session.createdAt)}, {durationWords(session.metrics.durationMs)}
+          {session.source === 'recording' && (
+            <span className="mr-3 inline-flex rounded-pill bg-sky/15 px-3 py-0.5 text-label text-sky" data-testid="from-recording">
+              From a recording
+            </span>
+          )}
+          Field notes for your {talk.label.toLowerCase()}, {session.source === 'recording' ? 'uploaded' : 'recorded'} {longDate(session.createdAt)}, {durationWords(session.metrics.durationMs)}
         </p>
         {notes ? (
           notes.oneFix ? (
