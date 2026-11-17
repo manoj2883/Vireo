@@ -38,6 +38,14 @@ export interface NaturalPhrasing {
   why: string;
 }
 
+export type BeatKind = 'hook' | 'stakes' | 'turn' | 'payoff' | 'landing';
+
+/** Story beats: those present are quoted exactly; a missing one may carry a suggestion in the speaker's words. */
+export interface StoryBeats {
+  present: { kind: BeatKind; quote: string; startMs: number }[];
+  missing: { kind: BeatKind; suggestion: string | null }[];
+}
+
 export interface FieldNotes {
   verdict: string;
   /** The single most important change, as an instruction for the next take. Absent in older notes. */
@@ -59,6 +67,12 @@ export interface FieldNotes {
   notes: FieldNote[];
   audienceFollowUp: { question: string; reason: string };
   drills: Drill[];
+  /** Absent in notes written before the story coach. */
+  storyBeats?: StoryBeats;
+  /** Whether the answer lands; if not, up to two closing lines of 12 words or fewer, from the speaker's words. */
+  landing?: { hasClearClose: boolean; suggestions: string[] };
+  droppedBeats?: number;
+  droppedLandingLines?: number;
   /** "Say it more naturally": up to three lines, each quoted from the transcript. Absent in older notes. */
   naturalPhrasing?: NaturalPhrasing[];
   provider?: string;

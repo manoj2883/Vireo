@@ -65,6 +65,24 @@ describe('POST /api/field-notes', () => {
     expect((await post({ transcript: TRANSCRIPT })).body.oneFix.direction).toBeNull();
   });
 
+  it('evidence-checks story beats and landing lines', async () => {
+    const storyBeats = {
+      present: [
+        { kind: 'hook', quote: 'teaching AI systems to say no', startMs: 400 },
+        { kind: 'payoff', quote: 'we won the national prize', startMs: 6200 },
+      ],
+      missing: [{ kind: 'landing', suggestion: 'End on "the right ones to refuse".' }],
+    };
+    const landing = { hasClearClose: false, suggestions: ['The answers it refused were the right ones.', 'Trust is the product.'] };
+    const generate = vi.fn().mockResolvedValue({ notes: { ...structuredClone(NOTES), storyBeats, landing }, provider: 'fake', model: 'fake-1', attempts: 1 });
+    const { post } = await start({ generate });
+    const body = (await post({ transcript: TRANSCRIPT })).body;
+    expect(body.storyBeats.present).toEqual([storyBeats.present[0]]);
+    expect(body.storyBeats.missing.find((m) => m.kind === 'landing').suggestion).toBe('End on "the right ones to refuse".');
+    expect(body.landing).toEqual({ hasClearClose: false, suggestions: ['The answers it refused were the right ones.'] });
+    expect(body).toMatchObject({ droppedBeats: 1, droppedLandingLines: 1 });
+  });
+
   it('keeps only "say it more naturally" lines the speaker really said', async () => {
     const naturalPhrasing = [
       { original: 'the right ones to refuse', natural: 'the ones it should refuse', why: 'Simpler.' },

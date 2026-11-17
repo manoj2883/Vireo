@@ -5,6 +5,7 @@ import { generateTeardown, generateTightened, describeProvider, TeardownError } 
 import { verifyNotes, verifyPhrasing, verifyPreviousFix } from './llm/evidence.js';
 import { FIX_DIRECTIONS } from './llm/schema.js';
 import { sanitizeSpeakingContext } from './llm/context.js';
+import { verifyLanding, verifyStoryBeats } from './llm/story.js';
 import { grantSttToken, SttTokenError } from './stt.js';
 import { createLimiter, identifyVisitor } from './limits.js';
 
@@ -76,6 +77,10 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
       if (dropped.length) {
         log.warn(`[field-notes] Dropped ${dropped.length} of ${result.notes.notes.length} notes: quote not found in transcript.`);
       }
+      // The story coach's beats and landing lines get the same evidence check as notes.
+      const beats = verifyStoryBeats(result.notes.storyBeats, lines);
+      const landing = verifyLanding(result.notes.landing, lines);
+      if (beats.dropped || landing.dropped) log.warn(`[field-notes] Dropped ${beats.dropped} story beats and ${landing.dropped} landing lines that failed the evidence check.`);
       res.json({
         sessionId: sessionId || 'sess_' + Date.now(),
         createdAt: new Date().toISOString(),
@@ -88,6 +93,10 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
         previousFix: verifyPreviousFix(result.notes.previousFix, lines),
         naturalPhrasing: verifyPhrasing(result.notes.naturalPhrasing, lines),
         droppedNotes: dropped.length,
+        storyBeats: beats.storyBeats,
+        landing: landing.landing,
+        droppedBeats: beats.dropped,
+        droppedLandingLines: landing.dropped,
       });
     } catch (err) {
       const status = err instanceof TeardownError ? err.status : 500;

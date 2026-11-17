@@ -20,11 +20,11 @@ PR: [#16](https://github.com/manoj2883/Vireo/pull/16), merged with CI green.
 | Feature | Status | Notes |
 | :--- | :--- | :--- |
 | 2.1 Context setup | done | Optional "Who's it for?" step on the warm-up (`ContextStep`). Stored as `config.context`, re-checked by `server/llm/context.js`, sent to field notes and tightening; `CONTEXT_RULE` in both system prompts. Roleplay picks it up in Phase 4. |
-| 2.2 Story beat map | not started | Sonogram already has `bands` and `markers` props for 2.2, 2.3 and 2.6. |
-| 2.3 Attention timeline | not started | |
-| 2.4 Landing line coach | not started | |
+| 2.2 Story beat map | done | `storyBeats` in the field notes schema; `server/llm/story.js` checks quotes and keeps a missing beat's suggestion only if it stays in the speaker's vocabulary. Sky markers on the sonogram plus a beat strip (`StoryBeats`). UNVERIFIED with a live model. |
+| 2.3 Attention timeline | done | `src/lib/attention.ts` and `src/lib/attentionPatterns.ts`, no model. Soft amber bands on the field notes sonogram; nothing under 90 s. |
+| 2.4 Landing line coach | done | `landing` in the schema; lines over 12 words or with words the speaker never said are rejected (`isValidLandingLine`, tested). `LandingLine` card. |
 | 2.5 Story Bank interviewer | not started | |
-| 2.6 Lightness cues | not started | |
+| 2.6 Lightness cues | done | `lightnessCues` in `src/lib/attention.ts`: every 105 s of speech with no lighter moment, snapped to a sentence end. Shows place plus a technique (callback, rule of three, understatement); never writes a joke. |
 
 PR: not opened yet.
 

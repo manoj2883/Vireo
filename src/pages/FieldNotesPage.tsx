@@ -18,6 +18,9 @@ import { saveConfig, type SessionConfig } from '@/session/config';
 import { deleteSession, getSession, getStory, listSessions, newId, saveStory, updateSession, type StoredSession } from '@/storage/localDb';
 import { ConfirmDelete } from '@/components/ConfirmDelete';
 import { HowScored } from '@/components/HowScored';
+import { BEAT_LABELS, StoryBeats } from '@/components/notes/StoryBeats';
+import { LandingLine } from '@/components/notes/LandingLine';
+import { attentionDrift, LIGHT_TECHNIQUES, lightnessCues } from '@/lib/attention';
 import type { FieldNote, FieldNotes } from '@/types/fieldNotes';
 
 const MIN_WORDS = 20;
@@ -216,11 +219,15 @@ function FieldNotesView({
 
   /** "Play this moment": seek the transcript to the note's time. */
   function playMoment(note: FieldNote) {
-    setHighlightMs(note.startMs);
+    playAt(note.startMs);
+  }
+
+  function playAt(ms: number) {
+    setHighlightMs(ms);
     const lines = transcriptRef.current?.querySelectorAll<HTMLElement>('[data-start-ms]') ?? [];
     let target: HTMLElement | null = null;
     lines.forEach((el) => {
-      if (Number(el.dataset.startMs) <= note.startMs) target = el;
+      if (Number(el.dataset.startMs) <= ms) target = el;
     });
     const el = (target ?? lines[0]) as HTMLElement | undefined;
     el?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
@@ -228,6 +235,14 @@ function FieldNotesView({
   }
 
   const pins = ordered.map((n, i) => ({ key: `note-${i}`, atMs: n.startMs, tone: n.kind === 'keep' ? ('olive' as const) : ('amber' as const), selected: i === selected }));
+  const beats = notes?.storyBeats;
+  const drift = attentionDrift(session.segments, beats?.present.map((b) => b.startMs) ?? []);
+  const cues = lightnessCues(session.segments);
+  const bands = drift.map((d, i) => ({ key: `drift-${i}`, ...d, label: 'Attention may drift here', tone: 'amber' as const }));
+  const markers = [
+    ...(beats?.present ?? []).map((b) => ({ key: `beat-${b.kind}`, atMs: b.startMs, label: BEAT_LABELS[b.kind].label.toLowerCase(), tone: 'sky' as const })),
+    ...cues.map((c, i) => ({ key: `light-${i}`, atMs: c.atMs, label: 'lighter beat?', tone: 'olive' as const })),
+  ];
 
   return (
     <div className="flex flex-col gap-24">
@@ -290,6 +305,8 @@ function FieldNotesView({
         <TightenedAnswer original={session.transcript.map((l) => l.text).join(' ')} tightened={session.tightened} pending={tightenPending} onRetry={onRetryTighten} />
       )}
 
+      {notes && <LandingLine landing={notes.landing} />}
+
       {notes && <NaturalPhrasing items={notes.naturalPhrasing} open={session.config.situationId === 'english'} />}
 
       <section aria-labelledby="whole-h" className="flex flex-col gap-5">
@@ -314,11 +331,13 @@ function FieldNotesView({
             }
             window={{ startMs: 0, endMs: Math.max(session.metrics.durationMs, 1000) }}
             pins={pins}
+            bands={bands}
+            markers={markers}
             selectedPinLabel={selectedNote?.title}
             showWordLabels={false}
             showTimeAxis
             labelPauses={false}
-            label={`The whole answer as a sonogram: ${session.segments.length} words, ${session.metrics.fillerCount} fillers, ${session.metrics.pauseCount} pauses.${selectedNote ? ` Pinned: ${selectedNote.title}` : ''}`}
+            label={`The whole answer as a sonogram: ${session.segments.length} words, ${session.metrics.fillerCount} fillers, ${session.metrics.pauseCount} pauses.${beats?.present.length ? ` Story beats: ${beats.present.map((b) => `${BEAT_LABELS[b.kind].label} at ${clock(b.startMs)}`).join(', ')}.` : ''}${drift.length ? ` Attention may drift ${drift.map((d) => `from ${clock(d.startMs)} to ${clock(d.endMs)}`).join(' and ')}.` : ''}${selectedNote ? ` Pinned: ${selectedNote.title}` : ''}`}
           />
         </div>
         {session.camera && (
@@ -327,12 +346,33 @@ function FieldNotesView({
             {session.camera.summary.smilePct}% of the time. The strip under the drawing is lit while you looked at the camera. Analysed on this device; no video was stored.
           </p>
         )}
+        {drift.length > 0 && (
+          <p className="m-0 text-small text-ink-muted" data-testid="attention-note">
+            Soft amber bands mark {drift.length === 1 ? 'a stretch' : 'stretches'} of 90 seconds or more with no example, name, number, question, story beat or signpost:{' '}
+            {drift.map((d) => `${clock(d.startMs)} to ${clock(d.endMs)}`).join(', ')}. Attention may drift there. Found by a fixed rule on your transcript, not by a model.
+          </p>
+        )}
+        {cues.length > 0 && (
+          <div className="flex flex-col gap-2 rounded-md bg-surface-100 p-5" data-testid="lightness-cues">
+            <p className="m-0 text-label">Room for a lighter beat</p>
+            <p className="m-0 text-small text-ink-muted">After a long stretch of explanation, listeners need a breather. These are places where one was due. Vireo marks the place; the moment is yours to write.</p>
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[15px]">
+              {cues.map((c) => (
+                <li key={c.atMs}>
+                  <span className="font-semibold">At {clock(c.atMs)}.</span> Try {LIGHT_TECHNIQUES[c.technique].name.toLowerCase()}: {LIGHT_TECHNIQUES[c.technique].example}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         {(session.likelyFillers?.length ?? 0) > 0 && (
           <p className="m-0 text-small text-ink-muted">
             Faint dashed strokes are sounds Vireo heard but the transcript has no word for, often an “um”. They aren’t counted as fillers.
           </p>
         )}
       </section>
+
+      {beats && <StoryBeats beats={beats} dropped={notes?.droppedBeats} onPlay={playAt} />}
 
       {notes && notes.storyMap.sections.length > 0 && <StoryMap notes={notes} durationMs={session.metrics.durationMs} hasOutline={Boolean(session.config.storyId)} />}
 

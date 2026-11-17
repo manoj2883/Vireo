@@ -100,7 +100,7 @@ export function TrustPage() {
           How feedback is checked
         </h2>
         <p className="m-0 text-body">
-          Field notes come from a language model, so Vireo doesn’t take them on trust. The reply must match a fixed schema. Every quote and “say it more naturally” line is matched word for word against your transcript, and every camera note must point at a real camera event. Anything that doesn’t match is dropped before you see it, and the notes page says how many were left out.
+          Field notes come from a language model, so Vireo doesn’t take them on trust. The reply must match a fixed schema. Every quote, story beat, landing line and “say it more naturally” line is matched word for word against your transcript, and every camera note must point at a real camera event. Anything that doesn’t match is dropped before you see it, and the notes page says how many were left out.
         </p>
         <p className="m-0 text-body">
           Pace, pauses and fillers aren’t written by a model at all: they’re measured in your browser. Each score has a “How this was scored” note with its formula, your inputs and its target.

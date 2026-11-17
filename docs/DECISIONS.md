@@ -27,3 +27,15 @@ Product decisions the build spec didn't cover, with the reasoning. Newest at the
 **D11. The data-flow table now lists hosting and downloads.** Building the trust page showed two flows the README never mentioned: Vercel's standard request logs, and the page asking Google Fonts for the typefaces. Both are now rows in `src/data/dataFlows.ts`. Self-hosting the fonts would remove the Google Fonts row; that's left as a choice for the owner.
 
 **D12. "Never infers emotion" names expression.** The camera reports smiling as a share of time. That's an observable expression, not a feeling, so the "Vireo never" list names visible expression among the observable signals and says it never reports what you felt.
+
+## Phase 2
+
+**D13. Context is cleaned when the session starts, not while typing.** The warm-up keeps the audience text as typed (so spaces work) and `cleanContext` trims and validates it in `start()`. The server re-checks it (`server/llm/context.js`), since a client can send anything.
+
+**D14. "The user's own vocabulary" for a missing beat's suggestion.** A suggestion may use instruction words ("open with", "say why it mattered") plus at most 3 other words the speaker never said; beyond that the suggestion is dropped and the beat just shows as missing. Requiring zero new words would make most instructions impossible to write.
+
+**D15. Landing lines use the tightened answer's word check.** "Built only from the user's own words" reuses `unsupportedWords` from `server/llm/tighten.js`: small linking words are allowed, any other new content word rejects the line.
+
+**D16. What counts as re-engaging attention.** Signposts, examples, lighter moments, numbers (digits and number words), a capitalised word mid-sentence (a name or place), a sentence ending in "?", and the story beats the notes found. Stretches are measured from the first word to the last, so 90 s of preamble counts too.
+
+**D17. Lightness cues every 105 s.** The spec says roughly every 90 to 120 s; cues sit at the midpoint, moved to the next sentence end within 20 s so they land at a natural break. Any lighter moment resets the clock. The three techniques rotate and their examples are generic, never about the speaker.
