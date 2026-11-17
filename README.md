@@ -114,18 +114,22 @@ Each provider handles what it receives under its own terms. Check them for the a
 
 ## Metric accuracy
 
-`npm run eval` replays hand-labelled recordings through the same pause detector, transcript timeline and pace meter a live session uses, and reports filler precision and recall, words-per-minute mean absolute error, and pause F1. The label format and an Audacity labelling workflow are in [`eval/README.md`](eval/README.md).
+`npm run eval` replays hand-labelled recordings through the same pause detector, transcript timeline and pace meter a live session uses. `npm run eval -- --report` writes the full report to [`docs/accuracy.md`](docs/accuracy.md), with 95% bootstrap intervals, and `npm run eval:readme` fills the table below. The synthetic example never counts. How to record and label clips is in [`eval/README.md`](eval/README.md).
 
-<!-- Fill in from `npm run eval` once real recordings are labelled in eval/labels/. -->
+<!-- eval:start -->
+| Metric | Result |
+| :--- | :--- |
+| Filler precision | Needs at least 10 labelled recordings (0 so far) |
+| Filler recall | Needs at least 10 labelled recordings (0 so far) |
+| Filler F1 | Needs at least 10 labelled recordings (0 so far) |
+| Pace error (wpm, mean absolute) | Needs at least 10 labelled recordings (0 so far) |
+| Pace within ±10 wpm | Needs at least 10 labelled recordings (0 so far) |
+| Pause precision | Needs at least 10 labelled recordings (0 so far) |
+| Pause recall | Needs at least 10 labelled recordings (0 so far) |
+| Pause F1 | Needs at least 10 labelled recordings (0 so far) |
 
-| Metric | Result | Recordings | Total length |
-| :--- | :---: | :---: | :---: |
-| Filler precision | — | — | — |
-| Filler recall | — | — | — |
-| Pace error (WPM, mean absolute) | — | — | — |
-| Pause F1 | — | — | — |
-
-Results will appear here once real recordings are labelled. For now, only a synthetic example runs, as a check that the harness works.
+No numbers are published until 10 real recordings are labelled. See [eval/README.md](eval/README.md) to help.
+<!-- eval:end -->
 
 ## Local setup
 
