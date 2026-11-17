@@ -9,8 +9,8 @@ Status: **done** (built, tested, committed), **in progress**, **not started**, *
 | Feature | Status | Notes |
 | :--- | :--- | :--- |
 | 1.1 Accuracy report | done | `npm run eval -- --report` writes `docs/accuracy.md` and `src/data/accuracy.json`; `npm run eval:readme` fills the README. 0 real recordings so far, so nothing is published. |
-| 1.2 How this was scored | not started | |
-| 1.3 Fix adoption | not started | |
+| 1.2 How this was scored | done | `src/lib/scoreExplanations.ts` feeds the `HowScored` disclosure (field notes scores, Before and after, Home numbers), the PDF and `docs/scoring.md` (`npm run docs`). A render test checks every `[data-score]` has one. |
+| 1.3 Fix adoption | done | Schema: `oneFix.targetMetric` + `direction` (server-normalised). `src/lib/fixAdoption.ts` thresholds and tolerances. Shown on Before and after, Home ("Fixes adopted on a retake") and the PDF. UNVERIFIED with a live model: the prompt change needs one real session to confirm models fill `targetMetric` well. |
 | 1.4 Trust page | not started | |
 
 PR: not opened yet.

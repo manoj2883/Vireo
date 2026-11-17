@@ -56,6 +56,15 @@ describe('POST /api/field-notes', () => {
     expect(generate).toHaveBeenCalledWith(expect.arrayContaining([expect.objectContaining({ startMs: 6200 })]), { prompt: 'Tell me' });
   });
 
+  it('sets the fix direction from its target metric, whatever the model said', async () => {
+    const oneFix = { instruction: 'Cut the ums.', why: 'w', targetMetric: 'fillers_per_min', direction: 'higher' };
+    const generate = vi.fn().mockResolvedValue({ notes: { ...structuredClone(NOTES), oneFix }, provider: 'fake', model: 'fake-1', attempts: 1 });
+    const { post } = await start({ generate });
+    expect((await post({ transcript: TRANSCRIPT })).body.oneFix).toEqual({ ...oneFix, direction: 'lower' });
+    generate.mockResolvedValue({ notes: { ...structuredClone(NOTES), oneFix: { ...oneFix, targetMetric: 'not_measurable' } }, provider: 'fake', model: 'fake-1', attempts: 1 });
+    expect((await post({ transcript: TRANSCRIPT })).body.oneFix.direction).toBeNull();
+  });
+
   it('keeps only "say it more naturally" lines the speaker really said', async () => {
     const naturalPhrasing = [
       { original: 'the right ones to refuse', natural: 'the ones it should refuse', why: 'Simpler.' },

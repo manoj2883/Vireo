@@ -63,6 +63,18 @@ describe('report PDF', () => {
     expect(spec.numbers[0]).toEqual({ label: 'Fillers', before: '6.0 a minute', after: '3.0 a minute' });
   });
 
+  it('says whether the fix was adopted, measured on the device, and how it was scored', async () => {
+    const base = session();
+    const prev = session({ id: 's0', metrics: { ...base.metrics, fillersPerMin: 6 }, notes: { ...base.notes!, oneFix: { ...base.notes!.oneFix!, targetMetric: 'fillers_per_min' } } });
+    const spec = buildReport(session({ retakeOf: 's0' }), prev, { all: [prev, session({ retakeOf: 's0' })] });
+    expect(spec.fixAdoption).toBe('Fix adopted ✓ — fillers 6.0 → 3.0 a minute');
+    expect(spec.adoptionRate).toBe('Fixes adopted on a retake: Do a few retakes to see this.');
+    expect(spec.scoring[0]).toContain('Accuracy not yet published');
+    const raw = new TextDecoder('latin1').decode((await makeReportPdf(spec)).output('arraybuffer'));
+    expect(raw).toContain('Fix adopted');
+    expect(raw).toContain('HOW THIS WAS SCORED');
+  });
+
   it('keeps text inside the built-in fonts', () => {
     expect(pdfSafe('It’s “done” — 5 → 3…')).toBe('It\'s "done" - 5 -> 3...');
   });

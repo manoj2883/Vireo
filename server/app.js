@@ -3,6 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { generateTeardown, generateTightened, describeProvider, TeardownError } from './llm/index.js';
 import { verifyNotes, verifyPhrasing, verifyPreviousFix } from './llm/evidence.js';
+import { FIX_DIRECTIONS } from './llm/schema.js';
 import { grantSttToken, SttTokenError } from './stt.js';
 import { createLimiter, identifyVisitor } from './limits.js';
 
@@ -80,6 +81,8 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
         provider: result.provider,
         model: result.model,
         ...result.notes,
+        // The direction always follows the target, whatever the model said.
+        oneFix: result.notes.oneFix && { ...result.notes.oneFix, direction: FIX_DIRECTIONS[result.notes.oneFix.targetMetric] ?? null },
         notes,
         previousFix: verifyPreviousFix(result.notes.previousFix, lines),
         naturalPhrasing: verifyPhrasing(result.notes.naturalPhrasing, lines),

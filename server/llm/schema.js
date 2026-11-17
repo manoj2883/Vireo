@@ -45,12 +45,32 @@ export const NaturalPhrasingSchema = z.object({
   why: z.string().min(1),
 });
 
+/**
+ * The measure a one fix should move, so the next take can show whether it was adopted.
+ * Mirrors TARGET_METRICS in src/lib/fixAdoption.ts, which owns thresholds and directions.
+ */
+export const FIX_TARGET_METRICS = ['fillers_per_min', 'time_in_zone_pct', 'time_to_main_point_s', 'sentence_end_pauses_pct', 'eye_contact_pct', 'not_measurable'];
+
+/** The canonical direction of each target. The model's direction is replaced with this. */
+export const FIX_DIRECTIONS = {
+  fillers_per_min: 'lower',
+  time_in_zone_pct: 'higher',
+  time_to_main_point_s: 'lower',
+  sentence_end_pauses_pct: 'higher',
+  eye_contact_pct: 'higher',
+  not_measurable: null,
+};
+
 export const FieldNotesSchema = z.object({
   verdict: z.string().min(1),
   /** The single most important change, as an instruction for the next take. */
   oneFix: z.object({
     instruction: z.string().min(1),
     why: z.string().min(1),
+    /** The measure this fix should move on the next take, or "not_measurable". */
+    targetMetric: z.enum(FIX_TARGET_METRICS),
+    /** Lower or higher is better for that measure; null when not measurable. Normalised on the server. */
+    direction: z.enum(['lower', 'higher']).nullable(),
   }),
   /** When the main point was first stated, in ms; null if it never was. */
   mainPointMs: ms.nullable(),

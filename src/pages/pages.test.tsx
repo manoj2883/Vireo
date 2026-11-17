@@ -600,7 +600,7 @@ describe('Before and after', () => {
     renderAt('/notes/sess_1');
     const section = await screen.findByRole('region', { name: 'Before and after' });
     expect(within(section).getAllByRole('img')).toHaveLength(2);
-    expect(within(section).getByTestId('fix-result')).toHaveTextContent('Your fix: Lead with your result. Yes, you did it.');
+    expect(within(section).getByTestId('fix-result')).toHaveTextContent('Your fix: Lead with your result. The notes heard it in your words.');
     const changes = within(section).getByRole('list', { name: 'What changed' });
     expect(changes).toHaveTextContent('Fillers down from 6.0 a minute to 2.0 a minute.');
     expect(changes).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
@@ -618,6 +618,28 @@ describe('Before and after', () => {
     renderAt('/app');
     const week = await screen.findByRole('region', { name: 'Your best improvement this week' });
     expect(week).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
+  });
+
+  it('shows fix adoption measured on the device', async () => {
+    await seedPair();
+    const first = (await getSession('sess_0'))!;
+    await saveSession({ ...first, notes: { ...first.notes!, oneFix: { instruction: 'Cut the ums.', why: 'w', targetMetric: 'fillers_per_min', direction: 'lower' } } });
+    renderAt('/notes/sess_1');
+    expect(await screen.findByTestId('fix-adoption')).toHaveTextContent('Fix adopted ✓ — fillers 6.0 → 2.0 a minute');
+  });
+
+  it('puts “How this was scored” under every score and headline number', async () => {
+    await seedPair();
+    for (const path of ['/notes/sess_1', '/app']) {
+      const { container, unmount } = renderAt(path);
+      await waitFor(() => expect(container.querySelectorAll('[data-score]').length).toBeGreaterThan(3));
+      const scored = [...container.querySelectorAll<HTMLElement>('[data-score]')];
+      for (const el of scored) {
+        const id = el.dataset.score!;
+        expect(el.querySelector(`[data-how-scored="${id}"]`), `${path}: ${id} has no explanation`).not.toBeNull();
+      }
+      unmount();
+    }
   });
 });
 

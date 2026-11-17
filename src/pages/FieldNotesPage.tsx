@@ -17,6 +17,7 @@ import { previousTake } from '@/lib/compare';
 import { saveConfig, type SessionConfig } from '@/session/config';
 import { deleteSession, getSession, getStory, listSessions, newId, saveStory, updateSession, type StoredSession } from '@/storage/localDb';
 import { ConfirmDelete } from '@/components/ConfirmDelete';
+import { HowScored } from '@/components/HowScored';
 import type { FieldNote, FieldNotes } from '@/types/fieldNotes';
 
 const MIN_WORDS = 20;
@@ -446,7 +447,7 @@ function Scores({ notes, best, session }: { notes: FieldNotes; best: ReturnType<
         const change = best ? score - best[it.key] : null;
         const down = change !== null && change < 0;
         return (
-          <div key={it.key}>
+          <div key={it.key} data-score={it.key}>
             <div className="flex flex-wrap items-baseline gap-3">
               <span className={cn('font-display text-metric', down && 'text-amber')}>{score}</span>
               {change !== null && (
@@ -455,6 +456,7 @@ function Scores({ notes, best, session }: { notes: FieldNotes; best: ReturnType<
             </div>
             <p className="m-0 mt-2.5 text-lg font-semibold">{it.label}</p>
             <p className="m-0 mt-1 text-[15px] leading-[23px] text-ink-muted">{it.caption}</p>
+            <HowScored id={it.key} session={session} />
           </div>
         );
       })}

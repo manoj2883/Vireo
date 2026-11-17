@@ -6,6 +6,8 @@ import { compareTakes } from '@/lib/compare';
 import { situationById } from '@/session/situations';
 import { TALK_TYPES } from '@/live/metrics/pace';
 import type { StoredSession } from '@/storage/localDb';
+import { adoptionRate, describeAdoption, describeRate, fixAdoption } from '@/lib/fixAdoption';
+import { accuracyText, explanationFor } from '@/lib/scoreExplanations';
 import type { jsPDF } from 'jspdf';
 
 export interface ReportSpec {
@@ -19,6 +21,12 @@ export interface ReportSpec {
   /** Before and after on a retake; this take's numbers otherwise. */
   numbers: { label: string; before: string | null; after: string }[];
   fixResult: string | null;
+  /** Measured on the device: "Fix adopted ✓ — fillers 3.8 → 1.2 a minute". */
+  fixAdoption: string | null;
+  /** Across every retake on this device, when `all` is given: "7 of 10 retakes". */
+  adoptionRate: string | null;
+  /** "How this was scored", from the same explanations the app shows. */
+  scoring: string[];
   drills: { title: string; instructions: string; minutes: number }[];
   /** The speaker's words: only when they asked for them. */
   transcript: string | null;
@@ -26,7 +34,11 @@ export interface ReportSpec {
 
 const oneDp = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
-export function buildReport(session: StoredSession, previous: StoredSession | null, { includeWords = false }: { includeWords?: boolean } = {}): ReportSpec {
+export function buildReport(
+  session: StoredSession,
+  previous: StoredSession | null,
+  { includeWords = false, all }: { includeWords?: boolean; all?: readonly StoredSession[] } = {}
+): ReportSpec {
   const situation = situationById(session.config.situationId);
   const date = new Date(session.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
   let numbers: ReportSpec['numbers'];
@@ -53,6 +65,16 @@ export function buildReport(session: StoredSession, previous: StoredSession | nu
     naturalPhrasing: (session.notes?.naturalPhrasing ?? []).slice(0, 3).map((p) => ({ original: p.original, natural: p.natural, why: p.why })),
     numbers,
     fixResult,
+    fixAdoption: previous ? (() => {
+      const a = fixAdoption(previous, session);
+      return a ? describeAdoption(a) : null;
+    })() : null,
+    adoptionRate: all ? `Fixes adopted on a retake: ${describeRate(adoptionRate(all))}.` : null,
+    scoring: [
+      `Fillers, pace and pauses are measured on your device. ${accuracyText(explanationFor('fillersPerMin'), { session })}`,
+      `Structure, delivery and clarity are a model’s judgement. ${accuracyText(explanationFor('structure'), { session })}`,
+      'Every formula, target and its source: github.com/manoj2883/Vireo/blob/main/docs/scoring.md',
+    ],
     drills: (session.notes?.drills ?? []).slice(0, 3).map((d) => ({ title: d.title, instructions: d.instructions, minutes: d.minutes })),
     transcript: includeWords ? session.transcript.map((l) => l.text).join('\n') : null,
   };
@@ -151,10 +173,12 @@ export async function makeReportPdf(spec: ReportSpec): Promise<jsPDF> {
     text(spec.oneFix.why, 10, { color: MUTED, maxLines: 2 });
   }
 
-  if (spec.fixResult) {
+  if (spec.fixResult || spec.fixAdoption) {
     heading('Last time’s fix');
-    text(spec.fixResult, 10, { maxLines: 3 });
+    if (spec.fixAdoption) text(spec.fixAdoption, 11, { style: 'bold', maxLines: 2, gap: 2 });
+    if (spec.fixResult) text(spec.fixResult, 10, { maxLines: 3 });
   }
+  if (spec.adoptionRate) text(spec.adoptionRate, 10, { color: MUTED, maxLines: 1 });
 
   if (spec.numbers.length) {
     heading(spec.numbers[0].before !== null ? 'Before and after' : 'This take');
@@ -193,6 +217,11 @@ export async function makeReportPdf(spec: ReportSpec): Promise<jsPDF> {
       text(`${d.title} (${d.minutes} min)`, 10, { style: 'bold', gap: 0, maxLines: 1 });
       text(d.instructions, 9.5, { color: MUTED, maxLines: 3, gap: 4 });
     }
+  }
+
+  if (spec.scoring.length && y + 40 < bottom) {
+    heading('How this was scored');
+    for (const line of spec.scoring) text(line, 8.5, { color: MUTED, maxLines: 3, gap: 2 });
   }
 
   doc.setFont('helvetica', 'normal');

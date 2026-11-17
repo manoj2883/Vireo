@@ -5,11 +5,14 @@ import { buildShareCard, saveBlob, shareCardPng } from '@/lib/shareCard';
 import { Sonogram } from '@/components/sonogram';
 import { compareTakes, describeChange } from '@/lib/compare';
 import { cn } from '@/lib/utils';
+import { describeAdoption, fixAdoption } from '@/lib/fixAdoption';
+import { HowScored } from '@/components/HowScored';
 import type { StoredSession } from '@/storage/localDb';
 
 /** Before and after: the previous take and this one, on the same time scale, with what changed. */
 export function BeforeAfter({ before, after }: { before: StoredSession; after: StoredSession }) {
   const { changes, fix } = compareTakes(before, after);
+  const adoption = fixAdoption(before, after);
   const [includeWords, setIncludeWords] = useState(false);
   const [cardError, setCardError] = useState<string | null>(null);
   const wordsId = useId();
@@ -34,11 +37,19 @@ export function BeforeAfter({ before, after }: { before: StoredSession; after: S
         Before and after
       </h2>
 
+      {adoption && (
+        <div data-testid="fix-adoption" data-score="fixAdoption" className={cn('flex flex-col gap-1 rounded-lg p-6', adoption.status === 'adopted' ? 'bg-olive-soft' : 'bg-surface-100')}>
+          <p className="m-0 text-label text-ink-muted">Measured on your device</p>
+          <p className="m-0 font-display text-[clamp(24px,2.6vw,32px)] leading-[1.2]">{describeAdoption(adoption)}</p>
+          <HowScored id="fixAdoption" session={after} previous={before} />
+        </div>
+      )}
+
       {fix && (
         <div data-testid="fix-result" className={cn('flex flex-col gap-2 rounded-lg p-6', fix.achieved ? 'bg-olive-soft' : 'bg-amber-soft')}>
           <p className="m-0 flex items-center gap-2 text-label">
             {fix.achieved ? <Check className="h-4 w-4" aria-hidden="true" /> : <X className="h-4 w-4" aria-hidden="true" />}
-            Your fix: {fix.instruction} <span className="font-semibold">{fix.achieved ? 'Yes, you did it.' : 'Not yet.'}</span>
+            Your fix: {fix.instruction} <span className="font-semibold">{fix.achieved ? 'The notes heard it in your words.' : 'The notes didn’t hear it yet.'}</span>
           </p>
           <blockquote className="m-0 font-display text-[22px] italic leading-[1.4]">“{fix.evidence}”</blockquote>
         </div>
@@ -64,7 +75,7 @@ export function BeforeAfter({ before, after }: { before: StoredSession; after: S
       {changes.length > 0 && (
         <ul className="m-0 grid list-none grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-6 p-0" aria-label="What changed">
           {changes.map((c) => (
-            <li key={c.key} className="flex flex-col gap-1 border-t border-line pt-3">
+            <li key={c.key} data-score={c.key} className="flex flex-col gap-1 border-t border-line pt-3">
               <span className="text-label text-ink-muted">{c.label}</span>
               <span className="font-display text-[30px] leading-none tabular-nums">
                 {c.format(c.before)} <span aria-hidden="true">→</span> {c.format(c.after)}
@@ -73,6 +84,7 @@ export function BeforeAfter({ before, after }: { before: StoredSession; after: S
                 {c.improvement > 0 ? 'Better. ' : c.improvement < 0 ? 'Worse. ' : ''}
                 <span className="sr-only">{describeChange(c)}</span>
               </span>
+              <HowScored id={c.key} session={after} />
             </li>
           ))}
         </ul>

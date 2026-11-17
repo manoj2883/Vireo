@@ -25,5 +25,5 @@
     "paths": { "@/*": ["./src/*"] },
     "types": ["vitest/globals", "@testing-library/jest-dom", "node"]
   },
-  "include": ["src", "eval"]
+  "include": ["src", "eval", "scripts/**/*.ts"]
 }

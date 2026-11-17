@@ -14,6 +14,7 @@ import { evaluateFile } from './lib/evaluate';
 import { combine } from './lib/scoring';
 import { buildAccuracyReport, README_END, README_START, renderAccuracyMarkdown, renderReadmeTable, replaceBetween, type RecordingResult } from './lib/report';
 import type { LabelFile } from './lib/types';
+import { renderScoringMarkdown } from '../src/lib/scoreExplanations';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, '..');
@@ -83,7 +84,9 @@ if (writeReport || writeReadme) {
     fs.writeFileSync(path.join(root, 'docs/accuracy.md'), renderAccuracyMarkdown(report));
     fs.mkdirSync(path.join(root, 'src/data'), { recursive: true });
     fs.writeFileSync(path.join(root, 'src/data/accuracy.json'), `${JSON.stringify(report, null, 2)}\n`);
-    console.log(`Wrote docs/accuracy.md and src/data/accuracy.json (${report.published ? 'published' : `not published: fewer than ${report.minRecordings} real recordings`}).`);
+    // docs/scoring.md quotes the accuracy, so it's regenerated with it.
+    fs.writeFileSync(path.join(root, 'docs/scoring.md'), renderScoringMarkdown(report));
+    console.log(`Wrote docs/accuracy.md, docs/scoring.md and src/data/accuracy.json (${report.published ? 'published' : `not published: fewer than ${report.minRecordings} real recordings`}).`);
   }
   if (writeReadme) {
     const readmePath = path.join(root, 'README.md');
