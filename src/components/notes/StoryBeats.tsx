@@ -1,16 +1,7 @@
 import { clock } from '@/lib/format';
 import { cn } from '@/lib/utils';
-import type { BeatKind, StoryBeats as Beats } from '@/types/fieldNotes';
-
-export const BEAT_ORDER: BeatKind[] = ['hook', 'stakes', 'turn', 'payoff', 'landing'];
-
-export const BEAT_LABELS: Record<BeatKind, { label: string; meaning: string }> = {
-  hook: { label: 'Hook', meaning: 'The opening that makes a listener want more.' },
-  stakes: { label: 'Stakes', meaning: 'What was at risk, or why it mattered.' },
-  turn: { label: 'Turn', meaning: 'The moment things changed.' },
-  payoff: { label: 'Payoff', meaning: 'The result.' },
-  landing: { label: 'Landing line', meaning: 'The line that sums it up at the end.' },
-};
+import type { StoryBeats as Beats } from '@/types/fieldNotes';
+import { BEAT_LABELS, BEAT_ORDER } from '@/lib/storyBeats';
 
 /** The story beat strip: which of the five beats are in the answer, and what to add for those missing. */
 export function StoryBeats({ beats, dropped, onPlay }: { beats: Beats; dropped?: number; onPlay: (ms: number) => void }) {

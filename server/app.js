@@ -1,7 +1,8 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { generateTeardown, generateTightened, describeProvider, TeardownError } from './llm/index.js';
+import { generateTeardown, generateTightened, generateInterviewTurn, describeProvider, TeardownError } from './llm/index.js';
+import { sanitizeTurns } from './llm/interview.js';
 import { verifyNotes, verifyPhrasing, verifyPreviousFix } from './llm/evidence.js';
 import { FIX_DIRECTIONS } from './llm/schema.js';
 import { sanitizeSpeakingContext } from './llm/context.js';
@@ -15,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * The HTTP API: transcription tokens, field notes and health, plus the built front end.
  * `generate` is injectable so the field notes route can be tested without a model.
  */
-export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, grantToken = grantSttToken, fetchImpl = fetch, log = console, limiter } = {}) {
+export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, interview = generateInterviewTurn, grantToken = grantSttToken, fetchImpl = fetch, log = console, limiter } = {}) {
   const limits = limiter ?? createLimiter({ env });
   if (env.VERCEL && limits.backend === 'memory') {
     log.warn('[limits] Upstash Redis is not configured, so usage limits are per function instance. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
@@ -124,6 +125,20 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
     } catch (err) {
       const status = err instanceof TeardownError ? err.status : 500;
       log.error('[Server /api/tighten Error]:', err.message);
+      res.status(status).json({ error: err.message, provider: err.provider });
+    }
+  });
+
+  // Story Bank interviewer: one question per turn, each turn counted against the write limits.
+  app.post('/api/story-interview', limit('write'), async (req, res) => {
+    const turns = sanitizeTurns(req.body?.turns);
+    if (!turns.some((t) => t.role === 'speaker')) return res.status(400).json({ error: 'Answer the first question to start the interview.' });
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 120) : undefined;
+    try {
+      res.json(await interview({ title: title || undefined, turns }));
+    } catch (err) {
+      const status = err instanceof TeardownError ? err.status : 500;
+      log.error('[Server /api/story-interview Error]:', err.message);
       res.status(status).json({ error: err.message, provider: err.provider });
     }
   });

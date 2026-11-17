@@ -32,6 +32,12 @@ export const DATA_FLOWS: DataFlow[] = [
     goesTo: 'The Vireo server, which sends it to the provider in `LLM_PROVIDER` (and `LLM_FALLBACKS` if that one is busy): **Google Gemini**, **Anthropic** (Claude), or **OpenRouter** (which forwards it to the provider of the model chosen).',
   },
   {
+    id: 'story-interview',
+    what: 'Your answers in the Story Bank interview, and the story’s working title',
+    when: 'When you use “Build a story with me”, one answer at a time',
+    goesTo: 'The Vireo server, which sends them to the same field notes provider. The finished story is saved only on this device.',
+  },
+  {
     id: 'limits',
     what: 'An anonymous random cookie and your IP address',
     when: 'When a session starts and when notes are written',

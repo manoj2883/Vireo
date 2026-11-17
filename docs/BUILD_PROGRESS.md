@@ -23,7 +23,7 @@ PR: [#16](https://github.com/manoj2883/Vireo/pull/16), merged with CI green.
 | 2.2 Story beat map | done | `storyBeats` in the field notes schema; `server/llm/story.js` checks quotes and keeps a missing beat's suggestion only if it stays in the speaker's vocabulary. Sky markers on the sonogram plus a beat strip (`StoryBeats`). UNVERIFIED with a live model. |
 | 2.3 Attention timeline | done | `src/lib/attention.ts` and `src/lib/attentionPatterns.ts`, no model. Soft amber bands on the field notes sonogram; nothing under 90 s. |
 | 2.4 Landing line coach | done | `landing` in the schema; lines over 12 words or with words the speaker never said are rejected (`isValidLandingLine`, tested). `LandingLine` card. |
-| 2.5 Story Bank interviewer | not started | |
+| 2.5 Story Bank interviewer | done | `server/llm/interview.js` (schema, prompt, evidence check: slots must quote the answers, script uses only their words, 90 words max) behind `POST /api/story-interview` (write-limited per turn). `StoryInterviewer` panel in the Story Bank; Save or "Rehearse this story" (warm-up preset with its key points). New data-flow row. UNVERIFIED with a live model. |
 | 2.6 Lightness cues | done | `lightnessCues` in `src/lib/attention.ts`: every 105 s of speech with no lighter moment, snapped to a sentence end. Shows place plus a technique (callback, rule of three, understatement); never writes a joke. |
 
 PR: not opened yet.

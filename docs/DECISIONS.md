@@ -39,3 +39,9 @@ Product decisions the build spec didn't cover, with the reasoning. Newest at the
 **D16. What counts as re-engaging attention.** Signposts, examples, lighter moments, numbers (digits and number words), a capitalised word mid-sentence (a name or place), a sentence ending in "?", and the story beats the notes found. Stretches are measured from the first word to the last, so 90 s of preamble counts too.
 
 **D17. Lightness cues every 105 s.** The spec says roughly every 90 to 120 s; cues sit at the midpoint, moved to the next sentence end within 20 s so they land at a natural break. Any lighter moment resets the clock. The three techniques rotate and their examples are generic, never about the speaker.
+
+**D18. The interviewer's first question is asked locally.** "When was it, and where were you?" is always the right opener, so it costs no model call; the endpoint refuses a request with no answer yet.
+
+**D19. Interview turns share the write limit.** Each turn is one model call, so it counts against the same per-visitor and per-IP hourly write limits as field notes, rather than adding a new limit and env var. A full interview is about 7 to 10 turns.
+
+**D20. Interview slots are quotes; the script is checked like the tightened answer.** Each of the seven slots must be copied exactly from the speaker's answers or it's emptied. The 30-second script may use only the speaker's words plus linking words, at most 90 words (about 30 s at 150 wpm). A script that fails gets one repair round, then the turn fails and the answer stays in the box.

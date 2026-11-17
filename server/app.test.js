@@ -234,3 +234,25 @@ describe('POST /api/tighten', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('POST /api/story-interview', () => {
+  it('needs an answer before it asks anything, then passes clean turns to the interviewer', async () => {
+    const interview = vi.fn().mockResolvedValue({ done: false, question: 'Where were you?', filled: {}, story: null });
+    const { base } = await start({ interview });
+    const post = (body) => fetch(`${base}/api/story-interview`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+    expect((await post({ turns: [{ role: 'coach', text: 'When was it?' }] })).status).toBe(400);
+    const res = await post({ title: ' The crash ', turns: [{ role: 'coach', text: 'When was it?' }, { role: 'speaker', text: 'Last spring.' }] });
+    expect(res).toMatchObject({ status: 200, body: { question: 'Where were you?' } });
+    expect(interview).toHaveBeenCalledWith({ title: 'The crash', turns: [{ role: 'coach', text: 'When was it?' }, { role: 'speaker', text: 'Last spring.' }] });
+  });
+
+  it('counts each turn against the write limit', async () => {
+    const interview = vi.fn().mockResolvedValue({ done: false, question: 'q', filled: {}, story: null });
+    const limiter = { backend: 'memory', check: vi.fn().mockResolvedValue({ ok: false, rule: 'writes-hour', message: 'Too many', retryAfterSec: 60 }) };
+    const { base } = await start({ interview, limiter });
+    const r = await fetch(`${base}/api/story-interview`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ turns: [{ role: 'speaker', text: 'hi' }] }) });
+    expect(r.status).toBe(429);
+    expect(limiter.check).toHaveBeenCalledWith('write', expect.anything());
+    expect(interview).not.toHaveBeenCalled();
+  });
+});

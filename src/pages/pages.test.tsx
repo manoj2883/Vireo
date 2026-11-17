@@ -445,6 +445,47 @@ describe('Home', () => {
 });
 
 describe('Story Bank', () => {
+  it('builds a story through the interviewer, one question at a time, then rehearses it', async () => {
+    const filled = { hook: 'the demo crashed', stakes: null, turn: null, payoff: null, image: null, lesson: null, landing: null };
+    const story = { title: 'The crash', script: 'The demo crashed. We fixed it. Rehearse the failure.', keyPoints: ['The crash', 'The fix'] };
+    const all = { hook: 'a', stakes: 'b', turn: 'c', payoff: 'd', image: 'e', lesson: 'Rehearse the failure', landing: 'g' };
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ filled, done: false, question: 'What did your manager say?', story: null }) } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ filled: all, done: true, question: null, story }) } as Response);
+    renderAt('/stories');
+    fireEvent.click(await screen.findByRole('button', { name: 'Build a story with me' }));
+    const log = screen.getByRole('list', { name: 'Interview' });
+    expect(log).toHaveTextContent('When was it, and where were you?');
+    fireEvent.change(screen.getByLabelText('Your answer'), { target: { value: 'Tuesday night, the demo crashed.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
+    expect(await within(log).findByText('What did your manager say?')).toBeInTheDocument();
+    expect(screen.getByText('1 of 7 found in your answers.')).toBeInTheDocument();
+    const body = JSON.parse(String((spy.mock.calls[0][1] as RequestInit).body));
+    expect(body.turns).toEqual([
+      { role: 'coach', text: 'Think of the moment this story is about. When was it, and where were you?' },
+      { role: 'speaker', text: 'Tuesday night, the demo crashed.' },
+    ]);
+
+    fireEvent.change(screen.getByLabelText('Your answer'), { target: { value: 'We cancel or we fix it now.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
+    expect(await screen.findByTestId('interview-story')).toHaveTextContent('The demo crashed. We fixed it. Rehearse the failure.');
+    fireEvent.click(screen.getByRole('button', { name: 'Rehearse this story' }));
+    expect(await screen.findByLabelText('What are you answering or presenting?')).toHaveValue('The crash');
+    const saved = (await listStories('story'))[0];
+    expect(saved).toMatchObject({ title: 'The crash', keyPoints: ['The crash', 'The fix'], script: story.script, gist: 'Rehearse the failure', length: '30 seconds' });
+  });
+
+  it('keeps the answer when the interviewer fails', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false, status: 429, json: async () => ({ error: 'Too many field notes requests this hour.' }) } as Response);
+    renderAt('/stories');
+    fireEvent.click(await screen.findByRole('button', { name: 'Build a story with me' }));
+    fireEvent.change(screen.getByLabelText('Your answer'), { target: { value: 'Last spring.' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Answer' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Too many field notes requests this hour. Your answer is still in the box.');
+    expect(screen.getByLabelText('Your answer')).toHaveValue('Last spring.');
+  });
+
   it('creates a story with key points and offers to rehearse it', async () => {
     renderAt('/stories');
     expect(await screen.findByText('No stories yet.')).toBeInTheDocument();

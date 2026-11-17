@@ -6,6 +6,7 @@ import { createAnthropicProvider, ProviderRefusalError } from './providers/anthr
 import { describeError, withRetry } from './retry.js';
 import { extractJson } from './json.js';
 import { TIGHTEN_SYSTEM, TightenSchema, buildTightenPrompt, validateTightened } from './tighten.js';
+import { INTERVIEW_SYSTEM, InterviewSchema, buildInterviewPrompt, validateInterview } from './interview.js';
 
 export const PROVIDERS = ['gemini', 'openrouter', 'anthropic'];
 
@@ -223,6 +224,25 @@ export async function generateTightened(transcript, context = {}, opts = {}) {
       user: buildTightenPrompt(transcript, context),
       schema: TightenSchema,
       validate: (text) => validateTightened(text, said),
+    },
+    opts
+  );
+  return { ...r.data, provider: r.provider, model: r.model };
+}
+
+/**
+ * One turn of the Story Bank interviewer: the next question, or the finished 30-second story.
+ * @param {{ title?: string, turns: { role: 'coach' | 'speaker', text: string }[] }} input
+ */
+export async function generateInterviewTurn(input, opts = {}) {
+  const r = await generateStructured(
+    {
+      label: 'story-interview',
+      noun: 'interview replies',
+      system: INTERVIEW_SYSTEM,
+      user: buildInterviewPrompt(input),
+      schema: InterviewSchema,
+      validate: (text) => validateInterview(text, input.turns),
     },
     opts
   );
