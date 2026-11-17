@@ -11,6 +11,8 @@ import { listStories, type StoredStory } from '@/storage/localDb';
 import { usePreviewMedia } from '@/components/hud/usePreviewMedia';
 import { DemoResting } from '@/components/DemoResting';
 import { useDemoHealth } from '@/lib/health';
+import { ContextStep } from '@/components/warmup/ContextStep';
+import { cleanContext } from '@/session/speakingContext';
 
 type Source = SituationId | 'own' | 'story';
 const ALL_QUESTIONS = SITUATIONS.flatMap((x) => x.questions);
@@ -106,7 +108,7 @@ export function WarmUpPage() {
 
   function start() {
     if (!canStart) return;
-    saveConfig({ ...config, prompt: config.prompt.trim() });
+    saveConfig({ ...config, prompt: config.prompt.trim(), context: cleanContext(config.context) });
     navigate('/session');
   }
 
@@ -263,6 +265,8 @@ export function WarmUpPage() {
               </p>
             </fieldset>
           )}
+
+          <ContextStep value={config.context} onChange={(next) => set('context', next)} />
 
           <fieldset className="m-0 flex flex-col gap-3.5 border-0 p-0">
             <legend className="mb-3.5 p-0 text-ink-muted">How should Vireo coach you?</legend>

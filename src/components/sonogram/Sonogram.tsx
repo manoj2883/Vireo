@@ -12,6 +12,23 @@ export interface SonogramPin {
   selected?: boolean;
 }
 
+/** A soft background band over a stretch of time, e.g. "Attention may drift here". */
+export interface SonogramBand {
+  key: string;
+  startMs: number;
+  endMs: number;
+  label: string;
+  tone: 'amber' | 'sky';
+}
+
+/** A small labelled marker at a moment, e.g. a story beat ("hook") or a lighter-beat cue. */
+export interface SonogramMarker {
+  key: string;
+  atMs: number;
+  label: string;
+  tone: 'sky' | 'olive' | 'amber';
+}
+
 export interface SonogramProps {
   segments: readonly WordSegment[];
   pauses?: readonly PauseSpan[];
@@ -45,6 +62,10 @@ export interface SonogramProps {
   pins?: readonly SonogramPin[];
   /** Text shown above the selected pin. */
   selectedPinLabel?: string;
+  /** Soft background bands behind the trace (hero with a time axis only). */
+  bands?: readonly SonogramBand[];
+  /** Labelled markers along the bottom of the drawing (hero with a time axis only). */
+  markers?: readonly SonogramMarker[];
   showWordLabels?: boolean;
   showTimeAxis?: boolean;
   /** Label pauses automatically in the annotation band (hero only). */
@@ -82,6 +103,8 @@ export function Sonogram({
   label,
   pins = [],
   selectedPinLabel,
+  bands = [],
+  markers = [],
   showWordLabels = true,
   showTimeAxis = false,
   labelPauses = true,
@@ -173,6 +196,23 @@ export function Sonogram({
           <motion.rect x={0} y={0} height={height} width={sweep} />
         </clipPath>
       </defs>
+
+      {bands.length > 0 && spec.axis && (
+        <g aria-hidden="true" data-testid="bands">
+          {bands.map((b) => {
+            const x = layout.xAt(b.startMs);
+            const w = Math.max(2, layout.xAt(b.endMs) - x);
+            return (
+              <g key={b.key}>
+                <rect x={x} y={spec.axis!.top} width={w} height={spec.axis!.baselineY - spec.axis!.top} rx={10} className={b.tone === 'amber' ? 'fill-amber' : 'fill-sky'} fillOpacity={0.1} />
+                <text x={x + 10} y={spec.axis!.top + 22} fontSize={14} className={cn('font-sans', b.tone === 'amber' ? 'fill-amber' : 'fill-sky')}>
+                  {b.label}
+                </text>
+              </g>
+            );
+          })}
+        </g>
+      )}
 
       {spec.axis && (
         <g aria-hidden="true">
@@ -299,6 +339,24 @@ export function Sonogram({
               </>
             );
           })()}
+        </g>
+      )}
+
+      {markers.length > 0 && spec.axis && (
+        <g aria-hidden="true" data-testid="markers">
+          {markers.map((m) => {
+            const x = layout.xAt(m.atMs);
+            const y = spec.axis!.baselineY - 12;
+            const cls = m.tone === 'sky' ? 'fill-sky' : m.tone === 'olive' ? 'fill-olive' : 'fill-amber';
+            return (
+              <g key={m.key}>
+                <path d={`M ${x} ${y - 7} L ${x + 7} ${y} L ${x} ${y + 7} L ${x - 7} ${y} Z`} className={cls} />
+                <text x={x} y={y - 14} textAnchor="middle" fontSize={13} className={cn('font-sans font-semibold', cls)}>
+                  {m.label}
+                </text>
+              </g>
+            );
+          })}
         </g>
       )}
 

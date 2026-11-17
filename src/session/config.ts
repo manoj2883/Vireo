@@ -2,6 +2,7 @@ import type { CoachMode } from '@/live/metrics/nudges';
 import type { TalkType } from '@/live/metrics/pace';
 import type { Calibration } from '@/vision/cameraTracker';
 import type { SituationId } from './situations';
+import type { SpeakingContext } from './speakingContext';
 
 /** Everything the warm-up decides for a session. */
 export interface SessionConfig {
@@ -22,6 +23,8 @@ export interface SessionConfig {
   retake?: { fromSessionId: string; oneFix: string; script?: string };
   /** A drill to show during the take (from a reminder link or Home). */
   drill?: string;
+  /** Optional: who it's for, what it should do, how much rides on it. */
+  context?: SpeakingContext;
 }
 
 export const DEFAULT_CONFIG: SessionConfig = {

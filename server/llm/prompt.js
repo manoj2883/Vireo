@@ -1,3 +1,5 @@
+import { CONTEXT_RULE, describeSpeakingContext } from './context.js';
+
 // Prompt for the post-session field notes. The voice follows the Vireo design system:
 // plain, warm and specific, talking to the speaker as "you", backed by exact quotes.
 
@@ -21,6 +23,8 @@ Produce:
 - drills: one to three drills, each specific, repeatable and under ten minutes, aimed at the most important fix.
 - naturalPhrasing: up to three lines whose phrasing would sound non-native or unclear to an interviewer or audience (for example "so much joyful"). original is copied character for character from the transcript, like a quote; natural is how a native American English speaker would say it in this situation; why is one plain sentence. Keep the speaker's meaning exactly: change the wording, never what they said. Skip fillers and pacing, which other notes cover. If no line qualifies, return an empty array.
 
+${CONTEXT_RULE}
+
 Return only JSON matching the schema. No markdown.`;
 
 function clock(ms) {
@@ -39,6 +43,8 @@ export function buildFieldNotesPrompt(transcript, context = {}) {
 
   const parts = [];
   if (context.prompt) parts.push(`What they were answering: ${context.prompt}`);
+  const stated = describeSpeakingContext(context.speakingContext);
+  if (stated) parts.push(stated);
   if (context.talkType) parts.push(`Kind of talk: ${context.talkType}`);
   if (context.situation?.label) {
     const criteria = (context.situation.criteria ?? []).map((c) => `  - ${c}`).join('\n');

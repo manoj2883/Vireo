@@ -15,6 +15,7 @@ export async function requestFieldNotes(session: StoredSession, story?: StoredSt
       transcript: session.transcript,
       context: {
         prompt: session.config.prompt,
+        speakingContext: session.config.context,
         talkType: talk.label,
         mode: session.config.mode === 'coach' ? 'Coach me out loud' : 'Watch silently',
         durationMs: session.metrics.durationMs,

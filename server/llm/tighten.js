@@ -5,6 +5,7 @@
  */
 import { z } from 'zod/v4';
 import { extractJson } from './json.js';
+import { CONTEXT_RULE, describeSpeakingContext } from './context.js';
 
 export const TightenSchema = z.object({
   /** The script, with " / " where to pause. */
@@ -20,6 +21,8 @@ Keep their words and their facts. Cut fillers (um, uh, like, you know, so basica
 Mark pauses with " / " where the speaker should breathe, especially just before and just after the main point. Keep it to what was said, usually shorter.
 
 If a one fix is given, shape the script to make that fix easy (for example, a pause right before the result).
+
+${CONTEXT_RULE}
 
 Return only JSON: {"script": "...", "mainPoint": "..."} where mainPoint is the sentence in the script that states the main point.`;
 
@@ -62,12 +65,12 @@ export function unsupportedWords(script, transcriptText) {
   return out;
 }
 
-export function buildTightenPrompt(transcript, { prompt, oneFix } = {}) {
+export function buildTightenPrompt(transcript, { prompt, oneFix, speakingContext } = {}) {
   const text = transcript
     .filter((t) => t.speaker !== 'coach')
     .map((t) => t.text)
     .join('\n');
-  return [prompt ? `What they were answering: ${prompt}` : '', oneFix ? `One fix for the next take: ${oneFix}` : '', `What they said:\n${text}`]
+  return [prompt ? `What they were answering: ${prompt}` : '', describeSpeakingContext(speakingContext) ?? '', oneFix ? `One fix for the next take: ${oneFix}` : '', `What they said:\n${text}`]
     .filter(Boolean)
     .join('\n\n');
 }

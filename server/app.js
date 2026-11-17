@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { generateTeardown, generateTightened, describeProvider, TeardownError } from './llm/index.js';
 import { verifyNotes, verifyPhrasing, verifyPreviousFix } from './llm/evidence.js';
 import { FIX_DIRECTIONS } from './llm/schema.js';
+import { sanitizeSpeakingContext } from './llm/context.js';
 import { grantSttToken, SttTokenError } from './stt.js';
 import { createLimiter, identifyVisitor } from './limits.js';
 
@@ -109,7 +110,8 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
     try {
       const prompt = typeof context?.prompt === 'string' ? context.prompt.slice(0, 500) : undefined;
       const oneFix = typeof context?.oneFix === 'string' ? context.oneFix.slice(0, 500) : undefined;
-      res.json(await tighten(lines, { prompt, oneFix }));
+      const speakingContext = sanitizeSpeakingContext(context?.speakingContext) ?? undefined;
+      res.json(await tighten(lines, { prompt, oneFix, ...(speakingContext ? { speakingContext } : {}) }));
     } catch (err) {
       const status = err instanceof TeardownError ? err.status : 500;
       log.error('[Server /api/tighten Error]:', err.message);

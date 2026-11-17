@@ -7,7 +7,7 @@ export async function requestTightened(session: StoredSession, fetchImpl: typeof
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       transcript: session.transcript,
-      context: { prompt: session.config.prompt, oneFix: session.notes?.oneFix?.instruction },
+      context: { prompt: session.config.prompt, oneFix: session.notes?.oneFix?.instruction, speakingContext: session.config.context },
     }),
   });
   const body = await res.json().catch(() => ({}));

@@ -173,6 +173,19 @@ describe('Warm-up', () => {
     expect(await screen.findByText(/camera and microphone are blocked/i)).toBeInTheDocument();
   });
 
+  it('saves the optional audience, goal and stakes with the session, cleaned', () => {
+    mockFetch({ ok: true, body: { transcription: { configured: true }, fieldNotes: { configured: true } } });
+    renderAt('/warm-up');
+    fireEvent.click(screen.getByText('Who’s it for?'));
+    fireEvent.change(screen.getByLabelText('Audience'), { target: { value: '  Investors at a seed fund ' } });
+    fireEvent.click(screen.getByRole('radio', { name: 'Persuade' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Critical' }));
+    expect(screen.getByText(/feedback stays focused and serious/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /start speaking/i }));
+    const saved = JSON.parse(sessionStorage.getItem('vireo-session-config')!);
+    expect(saved.context).toEqual({ audience: 'Investors at a seed fund', goal: 'persuade', stakes: 'critical' });
+  });
+
   it('takes a preset from the Story Bank', () => {
     renderAt('/warm-up', { preset: { prompt: 'The judge that learned to say no', talkType: 'pitch', mode: 'watch' } });
     expect(screen.getByLabelText('What are you answering or presenting?')).toHaveValue('The judge that learned to say no');
@@ -222,12 +235,13 @@ describe('Try again', () => {
 
 describe('Field notes', () => {
   it('writes the notes on first open and shows them beside the transcript', async () => {
-    await saveSession(storedSession());
+    await saveSession(storedSession({ config: { ...storedSession().config, context: { goal: 'inform', stakes: 'important' } } }));
     const fetchSpy = mockFetch({ ok: true, body: NOTES });
     renderAt('/notes/sess_1');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' })).toBeInTheDocument();
     expect(notesCalls(fetchSpy)).toHaveLength(1);
+    expect(JSON.parse(String((notesCalls(fetchSpy)[0][1] as RequestInit).body)).context.speakingContext).toEqual({ goal: 'inform', stakes: 'important' });
     const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
     expect(body.context).toMatchObject({ prompt: 'Tell me about your research.', paceZone: { min: 130, max: 160 } });
     expect(body.transcript).toHaveLength(2);
