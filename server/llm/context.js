@@ -29,5 +29,32 @@ export function describeSpeakingContext(raw) {
   return `The speaker's stated context (${parts.join('; ')}). Every note, the one fix and the drills must fit it and never contradict it.`;
 }
 
+const SKILLS = ['fillers_per_min', 'time_in_zone_pct', 'time_to_main_point_s', 'sentence_end_pauses_pct', 'eye_contact_pct'];
+
+/** Only known, measurable skill ids, without repeats. */
+export function sanitizeMastered(raw) {
+  return Array.isArray(raw) ? [...new Set(raw.filter((s) => SKILLS.includes(s)))] : [];
+}
+
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 10) / 10 : null);
+
+/** The speaker's best earlier take on this question or situation, as plain numbers; null when none. */
+export function sanitizeBaseline(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const out = {};
+  for (const k of ['fillersPerMin', 'timeInZonePct', 'pausesPerMin', 'avgWpm']) {
+    const v = num(raw[k]);
+    if (v !== null) out[k] = v;
+  }
+  if (raw.scope === 'question' || raw.scope === 'situation') out.scope = raw.scope;
+  return Object.keys(out).length > 1 ? out : null;
+}
+
+/** Keep the speaker's own voice: progress is measured against their best, never a single ideal. */
+export const PERSONAL_STYLE_RULE = "Keep the speaker's natural style. Measure progress against their own best take when one is given, not a generic ideal, and never push them toward a single 'correct' voice, accent or personality.";
+
+/** Confidence mode: lead with what went well, keep it supportive and plain, never label feelings. */
+export const CONFIDENCE_RULE = 'In confidence mode, order the notes so what went well comes first, write the one fix as a small, encouraging next step, and keep every word supportive and plain. Never mention nerves, anxiety or any feeling.';
+
 /** Added to every system prompt that gives feedback. */
 export const CONTEXT_RULE = `Respect the speaker's stated context. Fit feedback to their audience, goal and stakes, and never contradict them: for a serious or critical-stakes talk, never suggest smiling more, adding jokes or lightening the mood; for a formal audience, never suggest casual phrasing. Judge an "inform" talk on clarity, "persuade" on whether it moves the listener to act, "inspire" on story and landing, and "get hired" on evidence of fit for the role.`;

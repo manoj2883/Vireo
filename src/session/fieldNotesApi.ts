@@ -2,9 +2,17 @@ import type { FieldNotes } from '@/types/fieldNotes';
 import type { StoredSession, StoredStory } from '@/storage/localDb';
 import { TALK_TYPES } from '@/live/metrics/pace';
 import { situationById } from './situations';
+import type { PersonalBaseline } from '@/lib/personalBest';
+import type { SkillId } from '@/lib/skills';
+
+/** What Vireo knows about the speaker from earlier sessions on this device, sent with the request. */
+export interface SpeakerMemory {
+  masteredSkills?: SkillId[];
+  personalBest?: PersonalBaseline | null;
+}
 
 /** Ask the server to write field notes for a stored session. Throws with the server's message. */
-export async function requestFieldNotes(session: StoredSession, story?: StoredStory, fetchImpl: typeof fetch = fetch): Promise<FieldNotes> {
+export async function requestFieldNotes(session: StoredSession, story?: StoredStory, fetchImpl: typeof fetch = fetch, memory: SpeakerMemory = {}): Promise<FieldNotes> {
   const talk = TALK_TYPES[session.config.talkType];
   const situation = situationById(session.config.situationId);
   const res = await fetchImpl('/api/field-notes', {
@@ -25,6 +33,9 @@ export async function requestFieldNotes(session: StoredSession, story?: StoredSt
         story: story ? { title: story.title, keyPoints: story.keyPoints } : undefined,
         metrics: session.metrics,
         camera: session.camera ? { summary: session.camera.summary, events: session.camera.events } : undefined,
+        masteredSkills: memory.masteredSkills?.length ? memory.masteredSkills : undefined,
+        personalBest: memory.personalBest ?? undefined,
+        confidenceMode: session.config.confidenceMode || undefined,
       },
     }),
   });
@@ -44,13 +55,14 @@ export async function requestFieldNotesWithRetry(
   session: StoredSession,
   story: StoredStory | undefined,
   onRetry: (firstError: Error) => void,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  memory: SpeakerMemory = {}
 ): Promise<FieldNotes> {
   try {
-    return await requestFieldNotes(session, story, fetchImpl);
+    return await requestFieldNotes(session, story, fetchImpl, memory);
   } catch (err) {
     onRetry(err instanceof Error ? err : new Error(String(err)));
     await new Promise((r) => setTimeout(r, fieldNotesRetry.delayMs));
-    return requestFieldNotes(session, story, fetchImpl);
+    return requestFieldNotes(session, story, fetchImpl, memory);
   }
 }

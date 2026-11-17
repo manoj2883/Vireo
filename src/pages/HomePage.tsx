@@ -14,6 +14,7 @@ import { saveConfig, type SessionConfig } from '@/session/config';
 import { adoptionRate, describeRate } from '@/lib/fixAdoption';
 import { HowScored } from '@/components/HowScored';
 import type { ScoreId } from '@/lib/scoreExplanations';
+import { EnglishPatternsSection, SkillsSection, WeeklyPlanSection } from '@/components/home/CoachSections';
 
 /** Home (`/app`): progress from real sessions, today's drill, the last ten sessions drawn. */
 export function HomePage() {
@@ -111,6 +112,8 @@ export function HomePage() {
         </div>
       </section>
 
+      {sessions.length > 0 && <WeeklyPlanSection sessions={sessions} />}
+
       {recent.length > 0 && (
         <section aria-labelledby="ten-h" className="flex flex-col gap-6">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
@@ -194,6 +197,10 @@ export function HomePage() {
           />
         </section>
       )}
+
+      {sessions.length > 0 && <SkillsSection sessions={sessions} />}
+
+      <EnglishPatternsSection sessions={sessions} />
 
       <section aria-labelledby="stories-h" className="flex flex-col gap-6">
         <div className="flex flex-wrap items-baseline justify-between gap-3">

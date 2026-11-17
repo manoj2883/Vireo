@@ -1,4 +1,4 @@
-import { CONTEXT_RULE, describeSpeakingContext } from './context.js';
+import { CONTEXT_RULE, CONFIDENCE_RULE, PERSONAL_STYLE_RULE, describeSpeakingContext, sanitizeBaseline, sanitizeMastered } from './context.js';
 
 // Prompt for the post-session field notes. The voice follows the Vireo design system:
 // plain, warm and specific, talking to the speaker as "you", backed by exact quotes.
@@ -23,9 +23,15 @@ Produce:
 - drills: one to three drills, each specific, repeatable and under ten minutes, aimed at the most important fix.
 - storyBeats: find these beats in the answer. hook: the opening line that makes a listener want more. stakes: what was at risk, or why it mattered. turn: the moment things changed. payoff: the result. landing: the closing line that sums it up. For each beat present, give kind, the quote copied character for character from the transcript, and its startMs; each kind at most once. For each beat missing, give kind and one concrete suggestion of what to add, using the speaker's own words, names and points (for example 'Open with "the answers it refused were the right ones" before you explain.'). Never invent facts the speaker didn't say.
 - landing: hasClearClose is true when the answer ends on a clear closing line. If it doesn't, suggestions holds up to two closing lines of 12 words or fewer, built only from the speaker's own words and points (you may add small linking words like and, so, the); otherwise an empty array.
-- naturalPhrasing: up to three lines whose phrasing would sound non-native or unclear to an interviewer or audience (for example "so much joyful"). original is copied character for character from the transcript, like a quote; natural is how a native American English speaker would say it in this situation; why is one plain sentence. Keep the speaker's meaning exactly: change the wording, never what they said. Skip fillers and pacing, which other notes cover. If no line qualifies, return an empty array.
+- naturalPhrasing: up to three lines whose phrasing would sound non-native or unclear to an interviewer or audience (for example "so much joyful"). original is copied character for character from the transcript, like a quote; natural is how a native American English speaker would say it in this situation; why is one plain sentence; category is the main kind of change: tense, article, preposition, word_order, plural, agreement (subject and verb), word_choice, idiom or other. Keep the speaker's meaning exactly: change the wording, never what they said. Skip fillers and pacing, which other notes cover. If no line qualifies, return an empty array.
 
 ${CONTEXT_RULE}
+
+${PERSONAL_STYLE_RULE}
+
+Skill memory: when mastered skills are listed, never choose a one fix whose targetMetric is one of them; pick the next most useful fix instead.
+
+${CONFIDENCE_RULE}
 
 Return only JSON matching the schema. No markdown.`;
 
@@ -47,6 +53,14 @@ export function buildFieldNotesPrompt(transcript, context = {}) {
   if (context.prompt) parts.push(`What they were answering: ${context.prompt}`);
   const stated = describeSpeakingContext(context.speakingContext);
   if (stated) parts.push(stated);
+  const mastered = sanitizeMastered(context.masteredSkills);
+  if (mastered.length) parts.push(`Mastered skills (never the one fix's targetMetric): ${mastered.join(', ')}`);
+  const best = sanitizeBaseline(context.personalBest);
+  if (best) {
+    const { scope, ...nums } = best;
+    parts.push(`The speaker's personal best on this ${scope ?? 'question'}: ${JSON.stringify(nums)}. Compare with this, not a generic ideal.`);
+  }
+  if (context.confidenceMode === true) parts.push('Confidence mode is on: lead with what went well.');
   if (context.talkType) parts.push(`Kind of talk: ${context.talkType}`);
   if (context.situation?.label) {
     const criteria = (context.situation.criteria ?? []).map((c) => `  - ${c}`).join('\n');

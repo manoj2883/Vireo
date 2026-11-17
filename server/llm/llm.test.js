@@ -157,7 +157,7 @@ describe('validation helpers', () => {
   });
 
   it('accepts "say it more naturally" as absent, empty or up to three items', () => {
-    const item = { original: 'so much joyful', natural: 'really happy', why: 'Joyful describes a thing; for a feeling, say happy.' };
+    const item = { original: 'so much joyful', natural: 'really happy', why: 'Joyful describes a thing; for a feeling, say happy.', category: 'word_choice' };
     expect(validateReply(JSON.stringify(VALID)).data).toBeTruthy();
     expect(validateReply(JSON.stringify({ ...VALID, naturalPhrasing: [] })).data).toBeTruthy();
     expect(validateReply(JSON.stringify({ ...VALID, naturalPhrasing: [item, item, item] })).data).toBeTruthy();
@@ -283,5 +283,15 @@ describe('situation criteria', () => {
   it('passes the situation and what a good answer looks like', () => {
     const prompt = buildFieldNotesPrompt(TRANSCRIPT, { situation: { label: '60-second pitch', criteria: ['States the problem, the solution and a clear ask.'], timeLimitMs: 60_000 } });
     expect(prompt).toContain('Situation: 60-second pitch. Target length: under 60 seconds. A good answer here:\n  - States the problem, the solution and a clear ask.');
+  });
+});
+
+describe('skill memory is enforced', () => {
+  it('sends back a one fix that targets a mastered skill', async () => {
+    const mastered = { ...VALID, oneFix: { ...VALID.oneFix, targetMetric: 'fillers_per_min', direction: 'lower' } };
+    const provider = fakeProvider([JSON.stringify(mastered), JSON.stringify(VALID)]);
+    const r = await generateTeardown(TRANSCRIPT, { masteredSkills: ['fillers_per_min'] }, { provider, log: () => {} });
+    expect(r.notes.oneFix.targetMetric).toBe('sentence_end_pauses_pct');
+    expect(r.attempts).toBe(2);
   });
 });

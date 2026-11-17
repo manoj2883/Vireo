@@ -26,11 +26,19 @@ PR: [#16](https://github.com/manoj2883/Vireo/pull/16), merged with CI green.
 | 2.5 Story Bank interviewer | done | `server/llm/interview.js` (schema, prompt, evidence check: slots must quote the answers, script uses only their words, 90 words max) behind `POST /api/story-interview` (write-limited per turn). `StoryInterviewer` panel in the Story Bank; Save or "Rehearse this story" (warm-up preset with its key points). New data-flow row. UNVERIFIED with a live model. |
 | 2.6 Lightness cues | done | `lightnessCues` in `src/lib/attention.ts`: every 105 s of speech with no lighter moment, snapped to a sentence end. Shows place plus a technique (callback, rule of three, understatement); never writes a joke. |
 
+PR: [#17](https://github.com/manoj2883/Vireo/pull/17), merged with CI green.
+
+## Phase 3: A coach that knows you (branch `feat/phase-3-coach-knows-you`)
+
+| Feature | Status | Notes |
+| :--- | :--- | :--- |
+| 3.1 Skill memory | done | `src/lib/skills.ts` (skill = fix target; mastered = adopted 3 of last 4 across 2 questions). Field notes get `masteredSkills`; the server sends back a one fix that targets one (repair round). "Your skills" on Home, grouped by status. |
+| 3.2 Your own best as the bar | done | `src/lib/personalBest.ts`: best earlier take on this question, else this situation. Field notes scores compare with it; the request carries `personalBest`; `PERSONAL_STYLE_RULE` in the prompt. Ghost pace falls back to the situation's best (`situation:<id>` ghost key). |
+| 3.3 Weekly plan | done | `src/lib/weeklyPlan.ts` + drill library; snapshot per ISO week in IndexedDB settings (`weeklyPlanFor`). "This week's plan" on Home; each drill opens the warm-up with it preset. |
+| 3.4 Natural phrasing trends | done | `category` on each "say it more naturally" item; `src/lib/phrasing.ts` classifier (wins when sure) plus the model's label; top 3 recurring patterns with the speaker's own examples in "Speaking English with confidence" on Home. |
+| 3.5 Confidence mode | done | Warm-up switch. 60 s breathing (`BreathingWarmUp`, reduced motion keeps the circle still), camera never opened on the first take, HUD is the pause ring only, field notes open with "What went well" and the prompt leads with it. |
+
 PR: not opened yet.
-
-## Phase 3: A coach that knows you
-
-Not started.
 
 ## Phase 4: Real practice
 

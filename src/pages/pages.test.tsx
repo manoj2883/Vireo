@@ -672,6 +672,94 @@ describe('Story coach', () => {
   });
 });
 
+describe('A coach that knows you', () => {
+  const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+  const withFix = (targetMetric: 'fillers_per_min' | 'time_in_zone_pct', extra: Partial<FieldNotes> = {}): FieldNotes => ({
+    ...NOTES,
+    oneFix: { instruction: 'Cut the ums.', why: 'w', targetMetric, direction: 'lower' },
+    ...extra,
+  });
+
+  /** Two questions, each retaken twice, adopting the fillers fix three times out of four. */
+  async function seedMastery() {
+    let n = 0;
+    for (const [root, values] of [
+      ['q1', [5, 3, 2]],
+      ['q2', [6, 4, 3.8]],
+    ] as const) {
+      for (const [i, f] of values.entries()) {
+        n++;
+        await saveSession(
+          storedSession({
+            id: i === 0 ? root : `${root}-${i}`,
+            createdAt: minutesAgo(100 - n),
+            retakeOf: i === 0 ? undefined : root,
+            config: { ...storedSession().config, prompt: root === 'q1' ? 'Tell me about yourself.' : 'Why this role?' },
+            notesStatus: 'ready',
+            notes: withFix('fillers_per_min'),
+            metrics: { ...storedSession().metrics, fillersPerMin: f },
+          })
+        );
+      }
+    }
+  }
+
+  it('shows skills by status and this week’s plan on Home', async () => {
+    await seedMastery();
+    renderAt('/app');
+    const skills = await screen.findByRole('region', { name: 'Your skills' });
+    expect(within(skills).getByRole('list', { name: 'Mastered' })).toHaveTextContent('Fewer fillers');
+    expect(within(skills).getByRole('list', { name: 'Mastered' })).toHaveTextContent('Adopted in 3 of your last 4 retakes');
+    const plan = await screen.findByRole('region', { name: 'This week’s plan' });
+    expect(within(plan).getAllByRole('button', { name: /start this drill/i })).toHaveLength(3);
+    fireEvent.click(within(plan).getAllByRole('button', { name: /start this drill/i })[0]);
+    expect(await screen.findByText(/today’s drill:/i)).toBeInTheDocument();
+  });
+
+  it('tells the field notes your mastered skills and your personal best on this question', async () => {
+    await seedMastery();
+    await saveSession(storedSession({ id: 'now', createdAt: minutesAgo(1), config: { ...storedSession().config, prompt: 'Tell me about yourself.', confidenceMode: true } }));
+    const spy = mockFetch({ ok: true, body: NOTES });
+    renderAt('/notes/now');
+    await screen.findByRole('heading', { level: 1, name: 'Clear story. Rushed ending.' });
+    const context = JSON.parse(String((notesCalls(spy)[0][1] as RequestInit).body)).context;
+    expect(context.masteredSkills).toEqual(['fillers_per_min']);
+    expect(context.personalBest).toMatchObject({ scope: 'question', fillersPerMin: 2 });
+    expect(context.confidenceMode).toBe(true);
+  });
+
+  it('shows recurring phrasing patterns on Speaking English with confidence', async () => {
+    const phr = (o: string, n: string) => ({ original: o, natural: n, why: 'w' });
+    await saveSession(storedSession({ id: 'e1', createdAt: minutesAgo(30), config: { ...storedSession().config, situationId: 'english' }, notesStatus: 'ready', notes: { ...NOTES, naturalPhrasing: [phr('in Monday', 'on Monday')] } }));
+    await saveSession(storedSession({ id: 'e2', createdAt: minutesAgo(20), config: { ...storedSession().config, situationId: 'english' }, notesStatus: 'ready', notes: { ...NOTES, naturalPhrasing: [phr('in the weekend', 'on the weekend')] } }));
+    renderAt('/app');
+    const section = await screen.findByRole('region', { name: 'Speaking English with confidence' });
+    expect(section).toHaveTextContent('Prepositions');
+    expect(section).toHaveTextContent('2 times across 2 sessions');
+    expect(section).toHaveTextContent('on the weekend');
+  });
+
+  it('confidence mode: breathing first, camera off, pause ring only, and notes that start with what went well', async () => {
+    mockFetch({ ok: true, body: { transcription: { configured: true }, fieldNotes: { configured: true } } });
+    const { unmount } = renderAt('/warm-up');
+    fireEvent.click(screen.getByRole('switch', { name: /confidence mode/i }));
+    fireEvent.click(screen.getByRole('button', { name: /start speaking/i }));
+    expect(screen.getByRole('heading', { name: 'A minute to settle in' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent('Breathe in');
+    fireEvent.click(screen.getByRole('button', { name: /i’m ready, start speaking/i }));
+    expect(await screen.findByTestId('camera-off')).toHaveTextContent('Camera off for this first take');
+    expect(screen.getByTestId('calm-hud')).toBeInTheDocument();
+    expect(screen.queryByRole('switch', { name: 'Live captions' })).toBeNull();
+    unmount();
+
+    await saveSession(storedSession({ config: { ...storedSession().config, confidenceMode: true }, notesStatus: 'ready', notes: withFix('fillers_per_min') }));
+    renderAt('/notes/sess_1');
+    const wentWell = await screen.findByTestId('went-well');
+    expect(wentWell).toHaveTextContent('What went well');
+    expect(wentWell.compareDocumentPosition(screen.getByText('Your one fix for the next take')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
 describe('One fix and your answer, tightened', () => {
   const ONE_FIX = { ...NOTES, oneFix: { instruction: 'Give your result a full pause before you say it.', why: 'It lands harder.' }, mainPointMs: 2000 };
   const TIGHT = { script: 'The answers it refused were the right ones. / My research is about teaching AI systems to say no.', mainPoint: 'The answers it refused were the right ones.' };
