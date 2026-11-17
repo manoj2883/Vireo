@@ -173,6 +173,19 @@ describe('Warm-up', () => {
     expect(await screen.findByText(/camera and microphone are blocked/i)).toBeInTheDocument();
   });
 
+  it('picks the drill for the weakest skill when a rehearsal reminder opens, and flags the final run for questions', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: { ...NOTES, oneFix: { instruction: 'Cut the ums.', why: 'w', targetMetric: 'fillers_per_min', direction: 'lower' } } }));
+    mockFetch({ ok: true, body: { transcription: { configured: true }, fieldNotes: { configured: true } } });
+    const { unmount } = renderAt('/warm-up?prompt=Tell%20me%20about%20yourself.&situation=interview&drill=auto');
+    const drill = await screen.findByText(/today’s drill:/i);
+    expect(drill.parentElement?.textContent).toMatch(/um|filler|breath|first sentence/i);
+    expect(drill.parentElement?.textContent).not.toContain('auto');
+    unmount();
+    renderAt('/warm-up?prompt=Tell%20me%20about%20yourself.&situation=interview&drill=Full%20run&final=1');
+    fireEvent.click(screen.getByRole('button', { name: /start speaking/i }));
+    expect(JSON.parse(sessionStorage.getItem('vireo-session-config')!)).toMatchObject({ takeQuestions: true, drill: 'Full run' });
+  });
+
   it('saves the optional audience, goal and stakes with the session, cleaned', () => {
     mockFetch({ ok: true, body: { transcription: { configured: true }, fieldNotes: { configured: true } } });
     renderAt('/warm-up');

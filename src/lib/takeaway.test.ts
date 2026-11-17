@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { buildReport, makeReportPdf, pdfSafe } from './report';
-import { buildIcs, foldLine, googleCalendarLinks, icsEscape, outlookLinks, rehearsalDays, reminderEvents, warmUpLink } from './reminders';
+import { AUTO_DRILL, buildIcs, foldLine, FULL_RUN_DRILL, googleCalendarLinks, icsEscape, outlookLinks, rehearsalDays, reminderEvents, warmUpLink } from './reminders';
 import type { StoredSession } from '@/storage/localDb';
 
 const WORDS = 'Honestly my thesis measured refusal calibration across seven benchmarks';
@@ -122,17 +122,19 @@ describe('rehearsal reminders (.ics)', () => {
     expect(lines.find((l) => l.startsWith('SUMMARY:'))).toContain('briefly\\; then why us?');
   });
 
-  it('links each reminder to /warm-up with the prompt and that day’s drill, and no transcript', () => {
+  it('links each reminder to /warm-up: the weakest-skill drill, then a full run with questions, and no transcript', () => {
     const ics = buildIcs(input).replace(/\r\n /g, '');
     const urls = ics.split('\r\n').filter((l) => l.startsWith('URL:')).map((l) => new URL(l.slice(4)));
     expect(urls).toHaveLength(3);
     expect(urls.map((u) => u.pathname)).toEqual(['/warm-up', '/warm-up', '/warm-up']);
-    expect(urls.map((u) => u.searchParams.get('drill'))).toEqual(['Result first', 'Pause before numbers', 'Result first']);
+    expect(urls.map((u) => u.searchParams.get('drill'))).toEqual([AUTO_DRILL, AUTO_DRILL, FULL_RUN_DRILL]);
+    expect(urls.map((u) => u.searchParams.get('final'))).toEqual([null, null, '1']);
     for (const u of urls) {
       expect(u.searchParams.get('prompt')).toBe(input.prompt);
       expect(u.searchParams.get('situation')).toBe('interview');
-      expect([...u.searchParams.keys()].sort()).toEqual(['drill', 'prompt', 'situation']);
     }
+    expect([...urls[0].searchParams.keys()].sort()).toEqual(['drill', 'prompt', 'situation']);
+    expect(reminderEvents(input)[0].description).toContain('last time it was "Result first"');
     expect(ics).not.toContain('thesis');
   });
 
@@ -172,7 +174,7 @@ describe('rehearsal reminders (.ics)', () => {
       expect(new URL(outlook[i].href).searchParams.get('body')).toBe(e.description);
       expect(e.description).toContain(e.link);
     });
-    expect(google.map((g) => g.label)).toEqual(['Fri 16 Oct — Result first', 'Mon 19 Oct — Pause before numbers', 'Fri 23 Oct — Result first']);
+    expect(google.map((g) => g.label)).toEqual(['Fri 16 Oct — Drill for your weakest skill', 'Mon 19 Oct — Drill for your weakest skill', 'Fri 23 Oct — Full run with questions']);
     expect(outlook.map((o) => o.label)).toEqual(google.map((g) => g.label));
   });
 

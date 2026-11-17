@@ -23,6 +23,8 @@ export interface SessionConfig {
   retake?: { fromSessionId: string; oneFix: string; script?: string };
   /** A drill to show during the take (from a reminder link or Home). */
   drill?: string;
+  /** The last rehearsal before the big day: after the take, Vireo offers tough questions first. */
+  takeQuestions?: boolean;
   /** Confidence mode: breathing warm-up, camera-off first take, pause ring only, notes lead with what went well. */
   confidenceMode?: boolean;
   /** Optional: who it's for, what it should do, how much rides on it. */

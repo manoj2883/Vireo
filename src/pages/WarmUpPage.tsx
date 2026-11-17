@@ -7,13 +7,15 @@ import { Switch } from '@/components/ui/switch';
 import { TALK_TYPES, type TalkType } from '@/live/metrics/pace';
 import { DEFAULT_CONFIG, loadConfig, saveConfig, type SessionConfig, type WarmUpPreset } from '@/session/config';
 import { SITUATIONS, situationById, type SituationId } from '@/session/situations';
-import { listStories, type StoredStory } from '@/storage/localDb';
+import { listSessions, listStories, type StoredStory } from '@/storage/localDb';
 import { usePreviewMedia } from '@/components/hud/usePreviewMedia';
 import { DemoResting } from '@/components/DemoResting';
 import { useDemoHealth } from '@/lib/health';
 import { ContextStep } from '@/components/warmup/ContextStep';
 import { cleanContext } from '@/session/speakingContext';
 import { BreathingWarmUp } from '@/components/warmup/BreathingWarmUp';
+import { AUTO_DRILL } from '@/lib/reminders';
+import { buildWeeklyPlan } from '@/lib/weeklyPlan';
 
 type Source = SituationId | 'own' | 'story';
 const ALL_QUESTIONS = SITUATIONS.flatMap((x) => x.questions);
@@ -26,7 +28,9 @@ function presetFromUrl(params: URLSearchParams): WarmUpPreset {
   const prompt = params.get('prompt');
   if (prompt) out.prompt = prompt.slice(0, 300);
   const drill = params.get('drill');
-  if (drill) out.drill = drill.slice(0, 300);
+  // "auto" is resolved from local data once the page opens (see the effect below).
+  if (drill && drill !== AUTO_DRILL) out.drill = drill.slice(0, 300);
+  if (params.get('final') === '1') out.takeQuestions = true;
   return out;
 }
 
@@ -75,6 +79,18 @@ export function WarmUpPage() {
   useEffect(() => {
     listStories('story').then(setStories).catch(() => setStories([]));
   }, []);
+
+  // A rehearsal reminder asks for the drill for today's weakest skill: pick it from this device's sessions.
+  const autoDrill = params.get('drill') === AUTO_DRILL;
+  useEffect(() => {
+    if (!autoDrill) return;
+    listSessions()
+      .then((all) => {
+        const d = buildWeeklyPlan(all)?.drills[0];
+        setConfig((c) => ({ ...c, drill: d ? `${d.title}: ${d.instructions}` : 'Answer it once, start to finish, at your own pace.' }));
+      })
+      .catch(() => {});
+  }, [autoDrill]);
 
   // A story chosen from the bank fills an empty prompt with its title.
   useEffect(() => {
