@@ -5,7 +5,7 @@ import { buildReport, reportPdfBlob } from '@/lib/report';
 import { buildIcs, googleCalendarLinks, isoDay, MAX_DAYS_AHEAD, MIN_DAYS_AHEAD, outlookLinks, rehearsalDays } from '@/lib/reminders';
 import { saveBlob } from '@/lib/shareCard';
 import { situationById } from '@/session/situations';
-import type { StoredSession } from '@/storage/localDb';
+import { listSessions, type StoredSession } from '@/storage/localDb';
 
 const addDays = (day: string, n: number) => {
   const d = new Date(`${day}T12:00:00`);
@@ -38,7 +38,8 @@ export function TakeItWithYou({ session, previous }: { session: StoredSession; p
   async function downloadReport() {
     setPdfState('making');
     try {
-      saveBlob(await reportPdfBlob(buildReport(session, previous, { includeWords })), 'vireo-report.pdf');
+      const all = await listSessions().catch(() => undefined);
+      saveBlob(await reportPdfBlob(buildReport(session, previous, { includeWords, all })), 'vireo-report.pdf');
       setPdfState('idle');
     } catch (err) {
       setPdfState({ error: err instanceof Error ? err.message : String(err) });

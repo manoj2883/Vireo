@@ -7,7 +7,7 @@ import { ProviderRefusalError } from './providers/anthropic.js';
 const TRANSCRIPT = [{ speaker: 'user', text: 'So my research is about teaching AI systems to say no.', startMs: 0 }];
 const VALID = {
   verdict: 'Clear story.',
-  oneFix: { instruction: 'Pause before your result.', why: 'It gives the result room to land.' },
+  oneFix: { instruction: 'Pause before your result.', why: 'It gives the result room to land.', targetMetric: 'sentence_end_pauses_pct', direction: 'higher' },
   mainPointMs: 400,
   previousFix: null,
   summary: 'One. Two. Three.',

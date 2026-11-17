@@ -13,7 +13,7 @@ const TRANSCRIPT = [
 
 const VALID = {
   verdict: 'Clear story. Rushed ending.',
-  oneFix: { instruction: 'Pause before your result.', why: 'It gives the result room to land.' },
+  oneFix: { instruction: 'Pause before your result.', why: 'It gives the result room to land.', targetMetric: 'sentence_end_pauses_pct', direction: 'higher' },
   mainPointMs: 400,
   previousFix: null,
   summary: 'You opened with the point. The middle wandered. The result came too fast.',

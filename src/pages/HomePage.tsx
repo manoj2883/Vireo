@@ -11,6 +11,9 @@ import { ConfirmDelete } from '@/components/ConfirmDelete';
 import { KnownWords } from '@/components/KnownWords';
 import { bestImprovementThisWeek, describeChange } from '@/lib/compare';
 import { saveConfig, type SessionConfig } from '@/session/config';
+import { adoptionRate, describeRate } from '@/lib/fixAdoption';
+import { HowScored } from '@/components/HowScored';
+import type { ScoreId } from '@/lib/scoreExplanations';
 
 /** Home (`/app`): progress from real sessions, today's drill, the last ten sessions drawn. */
 export function HomePage() {
@@ -33,6 +36,7 @@ export function HomePage() {
   const drill = withDrill?.notes?.drills.find((d) => !withDrill.drillsDone?.includes(d.title)) ?? withDrill?.notes?.drills[0];
   const recent = sessions.slice(0, 10).reverse();
   const weekly = bestImprovementThisWeek(sessions);
+  const adoption = adoptionRate(sessions);
 
   function startDrill() {
     if (!withDrill) return;
@@ -55,6 +59,9 @@ export function HomePage() {
             </p>
             <p className="m-0 font-display text-[clamp(30px,4vw,48px)] leading-[1.05] tracking-[-0.02em]">{describeChange(weekly.change)}</p>
             <p className="m-0 text-small opacity-75">On “{weekly.session.config.prompt}”</p>
+            <div data-score={weekly.change.key}>
+              <HowScored id={weekly.change.key} session={weekly.session} className="text-paper-foreground/80" />
+            </div>
           </div>
           <Button variant="outline" size="lg" onClick={() => navigate(`/notes/${weekly.session.id}`)}>
             See before and after
@@ -141,18 +148,37 @@ export function HomePage() {
       {sessions.length > 0 && (
         <section className="grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-10 border-t border-line pt-10">
           <BigNumber
+            scoreId="fixAdoptionRate"
+            sessions={sessions}
+            value={adoption.enough ? `${adoption.adopted}/${adoption.measured}` : '—'}
+            tone={adoption.enough ? 'olive' : undefined}
+            label="Fixes adopted on a retake"
+            note={describeRate(adoption)}
+          />
+          <BigNumber
+            scoreId="timeInZonePct"
+            session={sessions[0]}
             value={numbers.timeInZonePct === null ? '—' : `${numbers.timeInZonePct}%`}
             label="Time in your pace zone"
             note={numbers.timeInZoneChange === null ? 'In your latest session' : `${signed(numbers.timeInZoneChange)} points on two weeks ago`}
           />
-          <BigNumber value={numbers.pausesPerMin === null ? '—' : oneDecimal(numbers.pausesPerMin)} tone="sky" label="Deliberate pauses a minute" note="Good speakers land between 3 and 5" />
           <BigNumber
+            scoreId="pausesPerMin"
+            session={sessions[0]}
+            value={numbers.pausesPerMin === null ? '—' : oneDecimal(numbers.pausesPerMin)}
+            tone="sky"
+            label="Deliberate pauses a minute"
+            note="Vireo’s rule of thumb is 3 to 5"
+          />
+          <BigNumber
+            scoreId="minutesThisWeek"
             value={String(numbers.minutesThisWeek)}
             unit="min"
             label="Practised this week"
             note={`Across ${numbers.sessionsThisWeek} ${numbers.sessionsThisWeek === 1 ? 'session' : 'sessions'}`}
           />
           <BigNumber
+            scoreId="followUpsWaiting"
             value={String(numbers.followUpsWaiting.length)}
             tone={numbers.followUpsWaiting.length ? 'amber' : undefined}
             label={numbers.followUpsWaiting.length === 1 ? 'Follow-up question waiting' : 'Follow-up questions waiting'}
@@ -209,7 +235,10 @@ export function HomePage() {
           Your data stays here
         </h2>
         <p className="m-0 max-w-[720px] text-body text-ink-muted">
-          Sessions, transcripts, field notes and your Story Bank are stored in this browser only. Video is analysed on this device and never leaves it. During a session, your audio goes to Deepgram to be transcribed; afterwards, your transcript goes to the model your server is set up to use for field notes.
+          Sessions, transcripts, field notes and your Story Bank are stored in this browser only. Video is analysed on this device and never leaves it. During a session, your audio goes to Deepgram to be transcribed; afterwards, your transcript goes to the model your server is set up to use for field notes.{' '}
+          <Link to="/trust" className="text-olive underline underline-offset-4">
+            Everything that leaves this device, and how feedback is checked
+          </Link>
         </p>
         <div>
           <ConfirmDelete
@@ -229,15 +258,34 @@ export function HomePage() {
   );
 }
 
-function BigNumber({ value, unit, label, note, tone }: { value: string; unit?: string; label: string; note: React.ReactNode; tone?: 'sky' | 'amber' }) {
+function BigNumber({
+  value,
+  unit,
+  label,
+  note,
+  tone,
+  scoreId,
+  session,
+  sessions,
+}: {
+  value: string;
+  unit?: string;
+  label: string;
+  note: React.ReactNode;
+  tone?: 'sky' | 'amber' | 'olive';
+  scoreId: ScoreId;
+  session?: StoredSession;
+  sessions?: StoredSession[];
+}) {
   return (
-    <div>
-      <p className={cn('m-0 font-display text-[72px] leading-none tracking-[-0.03em]', tone === 'sky' && 'text-sky', tone === 'amber' && 'text-amber')}>
+    <div data-score={scoreId}>
+      <p className={cn('m-0 font-display text-[72px] leading-none tracking-[-0.03em]', tone === 'sky' && 'text-sky', tone === 'amber' && 'text-amber', tone === 'olive' && 'text-olive')}>
         {value}
         {unit && <span className="text-[32px] text-ink-muted"> {unit}</span>}
       </p>
       <p className="m-0 mb-1 mt-3 text-lg font-semibold">{label}</p>
       <p className="m-0 text-[15px] text-ink-muted">{note}</p>
+      <HowScored id={scoreId} session={session} sessions={sessions} />
     </div>
   );
 }

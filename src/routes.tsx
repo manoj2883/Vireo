@@ -7,6 +7,7 @@ import { WarmUpPage } from '@/pages/WarmUpPage';
 import { FieldNotesPage } from '@/pages/FieldNotesPage';
 import { StoriesPage } from '@/pages/StoriesPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
+import { TrustPage } from '@/pages/TrustPage';
 
 // The live session pulls in the audio worklet and media code; load it only when needed.
 const LivePage = lazy(() => import('@/pages/LivePage').then((m) => ({ default: m.LivePage })));
@@ -20,6 +21,7 @@ export function AppRoutes() {
         <Route path="/warm-up" element={<WarmUpPage />} />
         <Route path="/notes/:id" element={<FieldNotesPage />} />
         <Route path="/stories" element={<StoriesPage />} />
+        <Route path="/trust" element={<TrustPage />} />
       </Route>
       <Route
         path="/session"

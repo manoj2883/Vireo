@@ -369,6 +369,38 @@ describe('Deleting', () => {
   });
 });
 
+describe('Trust page', () => {
+  it('is linked from the launch footer and Home', async () => {
+    const { unmount } = renderAt('/');
+    expect(screen.getByRole('link', { name: 'Trust and privacy' })).toHaveAttribute('href', '/trust');
+    unmount();
+    renderAt('/app');
+    expect(await screen.findByRole('link', { name: /everything that leaves this device/i })).toHaveAttribute('href', '/trust');
+  });
+
+  it('lists what stays, every data flow, what Vireo never does, and unpublished accuracy honestly', () => {
+    renderAt('/trust');
+    expect(screen.getByRole('heading', { level: 1, name: 'What happens to your voice' })).toBeInTheDocument();
+    const leaves = screen.getByRole('region', { name: 'Leaves this device' });
+    for (const name of ['Deepgram', 'Google Gemini', 'Upstash Redis', 'Vercel', 'Google Fonts', 'jsDelivr']) expect(within(leaves).getByText(name)).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Vireo never' })).toHaveTextContent(/never what you felt/);
+    expect(screen.getByRole('region', { name: 'Current accuracy' })).toHaveTextContent(/Not published yet.*at least 10 real recordings/);
+    expect(screen.getByRole('link', { name: 'MIT licence' })).toHaveAttribute('href', 'https://github.com/manoj2883/Vireo/blob/main/LICENSE');
+    expect(screen.getByRole('link', { name: 'run it yourself' })).toHaveAttribute('href', 'https://github.com/manoj2883/Vireo#local-setup');
+  });
+
+  it('deletes all data', async () => {
+    await saveSession(storedSession({ notesStatus: 'ready', notes: NOTES }));
+    renderAt('/trust');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete all data' }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Delete everything' }));
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent('Everything Vireo kept on this device is gone.');
+    expect(await getSession('sess_1')).toBeUndefined();
+  });
+});
+
 describe('Home', () => {
   it('builds the headline and numbers from real sessions', async () => {
     const day = 86_400_000;
@@ -600,7 +632,7 @@ describe('Before and after', () => {
     renderAt('/notes/sess_1');
     const section = await screen.findByRole('region', { name: 'Before and after' });
     expect(within(section).getAllByRole('img')).toHaveLength(2);
-    expect(within(section).getByTestId('fix-result')).toHaveTextContent('Your fix: Lead with your result. Yes, you did it.');
+    expect(within(section).getByTestId('fix-result')).toHaveTextContent('Your fix: Lead with your result. The notes heard it in your words.');
     const changes = within(section).getByRole('list', { name: 'What changed' });
     expect(changes).toHaveTextContent('Fillers down from 6.0 a minute to 2.0 a minute.');
     expect(changes).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
@@ -618,6 +650,28 @@ describe('Before and after', () => {
     renderAt('/app');
     const week = await screen.findByRole('region', { name: 'Your best improvement this week' });
     expect(week).toHaveTextContent('Time to the main point down from 20.0 s to 4.0 s.');
+  });
+
+  it('shows fix adoption measured on the device', async () => {
+    await seedPair();
+    const first = (await getSession('sess_0'))!;
+    await saveSession({ ...first, notes: { ...first.notes!, oneFix: { instruction: 'Cut the ums.', why: 'w', targetMetric: 'fillers_per_min', direction: 'lower' } } });
+    renderAt('/notes/sess_1');
+    expect(await screen.findByTestId('fix-adoption')).toHaveTextContent('Fix adopted ✓ — fillers 6.0 → 2.0 a minute');
+  });
+
+  it('puts “How this was scored” under every score and headline number', async () => {
+    await seedPair();
+    for (const path of ['/notes/sess_1', '/app']) {
+      const { container, unmount } = renderAt(path);
+      await waitFor(() => expect(container.querySelectorAll('[data-score]').length).toBeGreaterThan(3));
+      const scored = [...container.querySelectorAll<HTMLElement>('[data-score]')];
+      for (const el of scored) {
+        const id = el.dataset.score!;
+        expect(el.querySelector(`[data-how-scored="${id}"]`), `${path}: ${id} has no explanation`).not.toBeNull();
+      }
+      unmount();
+    }
   });
 });
 

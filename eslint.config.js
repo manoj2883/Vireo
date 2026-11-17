@@ -7,7 +7,7 @@ import tseslint from 'typescript-eslint';
 export default tseslint.config(
   { ignores: ['dist', 'node_modules', 'docs', '.vercel'] },
   {
-    files: ['src/**/*.{ts,tsx}', 'eval/**/*.ts'],
+    files: ['src/**/*.{ts,tsx}', 'eval/**/*.ts', 'scripts/**/*.ts'],
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     languageOptions: {
       ecmaVersion: 2020,

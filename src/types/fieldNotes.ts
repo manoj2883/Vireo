@@ -1,4 +1,9 @@
 /** Field notes as returned by POST /api/field-notes (mirrors server/llm/schema.js). */
+
+/** The measure a fix should move (mirrors FIX_TARGET_METRICS in server/llm/schema.js). */
+export type FixTargetMetric = 'fillers_per_min' | 'time_in_zone_pct' | 'time_to_main_point_s' | 'sentence_end_pauses_pct' | 'eye_contact_pct' | 'not_measurable';
+export type FixDirection = 'lower' | 'higher';
+
 export interface FieldNote {
   kind: 'keep' | 'fix';
   title: string;
@@ -36,7 +41,14 @@ export interface NaturalPhrasing {
 export interface FieldNotes {
   verdict: string;
   /** The single most important change, as an instruction for the next take. Absent in older notes. */
-  oneFix?: { instruction: string; why: string };
+  oneFix?: {
+    instruction: string;
+    why: string;
+    /** What the fix should move on the next take. Absent in notes written before fix adoption. */
+    targetMetric?: FixTargetMetric;
+    /** Set by the server from targetMetric; null when not measurable. */
+    direction?: FixDirection | null;
+  };
   /** When the main point was first stated (ms), or null. */
   mainPointMs?: number | null;
   /** On a retake: whether the previous fix was achieved, with quoted evidence. */
