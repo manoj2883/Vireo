@@ -65,6 +65,24 @@ describe('POST /api/field-notes', () => {
     expect((await post({ transcript: TRANSCRIPT })).body.oneFix.direction).toBeNull();
   });
 
+  it('evidence-checks story beats and landing lines', async () => {
+    const storyBeats = {
+      present: [
+        { kind: 'hook', quote: 'teaching AI systems to say no', startMs: 400 },
+        { kind: 'payoff', quote: 'we won the national prize', startMs: 6200 },
+      ],
+      missing: [{ kind: 'landing', suggestion: 'End on "the right ones to refuse".' }],
+    };
+    const landing = { hasClearClose: false, suggestions: ['The answers it refused were the right ones.', 'Trust is the product.'] };
+    const generate = vi.fn().mockResolvedValue({ notes: { ...structuredClone(NOTES), storyBeats, landing }, provider: 'fake', model: 'fake-1', attempts: 1 });
+    const { post } = await start({ generate });
+    const body = (await post({ transcript: TRANSCRIPT })).body;
+    expect(body.storyBeats.present).toEqual([storyBeats.present[0]]);
+    expect(body.storyBeats.missing.find((m) => m.kind === 'landing').suggestion).toBe('End on "the right ones to refuse".');
+    expect(body.landing).toEqual({ hasClearClose: false, suggestions: ['The answers it refused were the right ones.'] });
+    expect(body).toMatchObject({ droppedBeats: 1, droppedLandingLines: 1 });
+  });
+
   it('keeps only "say it more naturally" lines the speaker really said', async () => {
     const naturalPhrasing = [
       { original: 'the right ones to refuse', natural: 'the ones it should refuse', why: 'Simpler.' },
@@ -214,5 +232,27 @@ describe('POST /api/tighten', () => {
     const { base } = await start({ tighten: vi.fn() });
     const res = await fetch(`${base}/api/tighten`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ transcript: [{ speaker: 'user', text: 'short', startMs: 0 }] }) });
     expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/story-interview', () => {
+  it('needs an answer before it asks anything, then passes clean turns to the interviewer', async () => {
+    const interview = vi.fn().mockResolvedValue({ done: false, question: 'Where were you?', filled: {}, story: null });
+    const { base } = await start({ interview });
+    const post = (body) => fetch(`${base}/api/story-interview`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+    expect((await post({ turns: [{ role: 'coach', text: 'When was it?' }] })).status).toBe(400);
+    const res = await post({ title: ' The crash ', turns: [{ role: 'coach', text: 'When was it?' }, { role: 'speaker', text: 'Last spring.' }] });
+    expect(res).toMatchObject({ status: 200, body: { question: 'Where were you?' } });
+    expect(interview).toHaveBeenCalledWith({ title: 'The crash', turns: [{ role: 'coach', text: 'When was it?' }, { role: 'speaker', text: 'Last spring.' }] });
+  });
+
+  it('counts each turn against the write limit', async () => {
+    const interview = vi.fn().mockResolvedValue({ done: false, question: 'q', filled: {}, story: null });
+    const limiter = { backend: 'memory', check: vi.fn().mockResolvedValue({ ok: false, rule: 'writes-hour', message: 'Too many', retryAfterSec: 60 }) };
+    const { base } = await start({ interview, limiter });
+    const r = await fetch(`${base}/api/story-interview`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ turns: [{ role: 'speaker', text: 'hi' }] }) });
+    expect(r.status).toBe(429);
+    expect(limiter.check).toHaveBeenCalledWith('write', expect.anything());
+    expect(interview).not.toHaveBeenCalled();
   });
 });

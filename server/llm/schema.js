@@ -61,6 +61,20 @@ export const FIX_DIRECTIONS = {
   not_measurable: null,
 };
 
+const BEAT_KIND = z.enum(['hook', 'stakes', 'turn', 'payoff', 'landing']);
+
+/** Story beats found in the answer (quoted exactly) and those missing, with one suggestion each. */
+export const StoryBeatsSchema = z.object({
+  present: z.array(z.object({ kind: BEAT_KIND, quote: z.string().min(1), startMs: ms })).max(5),
+  missing: z.array(z.object({ kind: BEAT_KIND, suggestion: z.string().min(1) })).max(5),
+});
+
+/** Whether the answer ends on a clear closing line; if not, up to two short ones from the speaker's words. */
+export const LandingSchema = z.object({
+  hasClearClose: z.boolean(),
+  suggestions: z.array(z.string().min(1)).max(2),
+});
+
 export const FieldNotesSchema = z.object({
   verdict: z.string().min(1),
   /** The single most important change, as an instruction for the next take. */
@@ -97,6 +111,8 @@ export const FieldNotesSchema = z.object({
     reason: z.string().min(1),
   }),
   drills: z.array(DrillSchema).min(1),
+  storyBeats: StoryBeatsSchema,
+  landing: LandingSchema,
   /** Up to three lines to say more naturally; empty when none qualify. */
   naturalPhrasing: z.array(NaturalPhrasingSchema).max(3).optional(),
 });

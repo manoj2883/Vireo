@@ -53,6 +53,8 @@ export interface StoredStory {
   gist: string;
   /** The key points a rehearsal should hit, in order. */
   keyPoints: string[];
+  /** A 30-second version in the speaker's words, from the Story Bank interviewer. */
+  script?: string;
   createdAt: string;
   updatedAt: string;
   lastSessionId?: string;

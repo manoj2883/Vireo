@@ -9,6 +9,7 @@ import { deleteStory, getSession, listStories, newId, saveStory, type StoredSess
 import { importLegacyStoriesOnce } from '@/storage/legacyImport';
 import type { TalkType } from '@/live/metrics/pace';
 import { keyPointResults } from '@/lib/storyPoints';
+import { StoryInterviewer } from '@/components/stories/StoryInterviewer';
 
 const TAGS: Record<StoryKind, string[]> = {
   story: ['Interview', 'Research', 'Pitch', 'Talk', 'Toast'],
@@ -27,6 +28,7 @@ export function StoriesPage() {
   const [cards, setCards] = useState<Card[] | null>(null);
   const [counts, setCounts] = useState({ story: 0, bit: 0 });
   const [editing, setEditing] = useState<StoredStory | 'new' | null>(null);
+  const [interviewing, setInterviewing] = useState(false);
   const tabIds = { story: useId(), bit: useId(), panel: useId() };
 
   const load = useCallback(async () => {
@@ -74,11 +76,20 @@ export function StoriesPage() {
             The stories and lines you want ready on demand. Rehearse one and Vireo checks you hit its key points, not just how you sounded.
           </p>
         </div>
-        <Button onClick={() => setEditing('new')}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {tab === 'story' ? 'New story' : 'New bit'}
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          {tab === 'story' && (
+            <Button variant="outline" onClick={() => setInterviewing(true)} disabled={interviewing}>
+              Build a story with me
+            </Button>
+          )}
+          <Button onClick={() => setEditing('new')}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {tab === 'story' ? 'New story' : 'New bit'}
+          </Button>
+        </div>
       </section>
+
+      {interviewing && <StoryInterviewer onClose={() => setInterviewing(false)} onSaved={() => void load()} onRehearse={rehearse} />}
 
       {editing && (
         <StoryEditor

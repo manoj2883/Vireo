@@ -25,6 +25,8 @@ const VALID = {
   ],
   audienceFollowUp: { question: 'How do you measure a good refusal?', reason: 'It is the claim they will doubt.' },
   drills: [{ title: 'The full stop', instructions: 'State the result, breathe, explain.', minutes: 4 }],
+  storyBeats: { present: [], missing: [{ kind: 'hook', suggestion: 'Open with the result.' }] },
+  landing: { hasClearClose: true, suggestions: [] },
 };
 
 function fakeProvider(replies) {

@@ -1,9 +1,12 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { generateTeardown, generateTightened, describeProvider, TeardownError } from './llm/index.js';
+import { generateTeardown, generateTightened, generateInterviewTurn, describeProvider, TeardownError } from './llm/index.js';
+import { sanitizeTurns } from './llm/interview.js';
 import { verifyNotes, verifyPhrasing, verifyPreviousFix } from './llm/evidence.js';
 import { FIX_DIRECTIONS } from './llm/schema.js';
+import { sanitizeSpeakingContext } from './llm/context.js';
+import { verifyLanding, verifyStoryBeats } from './llm/story.js';
 import { grantSttToken, SttTokenError } from './stt.js';
 import { createLimiter, identifyVisitor } from './limits.js';
 
@@ -13,7 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * The HTTP API: transcription tokens, field notes and health, plus the built front end.
  * `generate` is injectable so the field notes route can be tested without a model.
  */
-export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, grantToken = grantSttToken, fetchImpl = fetch, log = console, limiter } = {}) {
+export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, interview = generateInterviewTurn, grantToken = grantSttToken, fetchImpl = fetch, log = console, limiter } = {}) {
   const limits = limiter ?? createLimiter({ env });
   if (env.VERCEL && limits.backend === 'memory') {
     log.warn('[limits] Upstash Redis is not configured, so usage limits are per function instance. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
@@ -75,6 +78,10 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
       if (dropped.length) {
         log.warn(`[field-notes] Dropped ${dropped.length} of ${result.notes.notes.length} notes: quote not found in transcript.`);
       }
+      // The story coach's beats and landing lines get the same evidence check as notes.
+      const beats = verifyStoryBeats(result.notes.storyBeats, lines);
+      const landing = verifyLanding(result.notes.landing, lines);
+      if (beats.dropped || landing.dropped) log.warn(`[field-notes] Dropped ${beats.dropped} story beats and ${landing.dropped} landing lines that failed the evidence check.`);
       res.json({
         sessionId: sessionId || 'sess_' + Date.now(),
         createdAt: new Date().toISOString(),
@@ -87,6 +94,10 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
         previousFix: verifyPreviousFix(result.notes.previousFix, lines),
         naturalPhrasing: verifyPhrasing(result.notes.naturalPhrasing, lines),
         droppedNotes: dropped.length,
+        storyBeats: beats.storyBeats,
+        landing: landing.landing,
+        droppedBeats: beats.dropped,
+        droppedLandingLines: landing.dropped,
       });
     } catch (err) {
       const status = err instanceof TeardownError ? err.status : 500;
@@ -109,10 +120,25 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
     try {
       const prompt = typeof context?.prompt === 'string' ? context.prompt.slice(0, 500) : undefined;
       const oneFix = typeof context?.oneFix === 'string' ? context.oneFix.slice(0, 500) : undefined;
-      res.json(await tighten(lines, { prompt, oneFix }));
+      const speakingContext = sanitizeSpeakingContext(context?.speakingContext) ?? undefined;
+      res.json(await tighten(lines, { prompt, oneFix, ...(speakingContext ? { speakingContext } : {}) }));
     } catch (err) {
       const status = err instanceof TeardownError ? err.status : 500;
       log.error('[Server /api/tighten Error]:', err.message);
+      res.status(status).json({ error: err.message, provider: err.provider });
+    }
+  });
+
+  // Story Bank interviewer: one question per turn, each turn counted against the write limits.
+  app.post('/api/story-interview', limit('write'), async (req, res) => {
+    const turns = sanitizeTurns(req.body?.turns);
+    if (!turns.some((t) => t.role === 'speaker')) return res.status(400).json({ error: 'Answer the first question to start the interview.' });
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 120) : undefined;
+    try {
+      res.json(await interview({ title: title || undefined, turns }));
+    } catch (err) {
+      const status = err instanceof TeardownError ? err.status : 500;
+      log.error('[Server /api/story-interview Error]:', err.message);
       res.status(status).json({ error: err.message, provider: err.provider });
     }
   });
