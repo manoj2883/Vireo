@@ -22,6 +22,8 @@ export interface LiveSessionConfig {
   talkType: TalkType;
   prompt: string;
   storyId?: string;
+  /** When there's no best take for this question yet, ghost pace uses the best for this situation. */
+  situationId?: string;
   fillers?: readonly string[];
   /** Expected delay between speaking and the transcript arriving (see TranscriptTimeline). */
   transcriptLatencyMs?: number;
@@ -138,6 +140,11 @@ export interface EngineDeps {
 
 const COACH_BUBBLE_MS = 3500;
 
+/** Ghost store key for a situation's best take. */
+export function situationGhostKey(situationId: string | undefined): string | null {
+  return situationId ? `situation:${situationId}` : null;
+}
+
 export class LiveSessionEngine {
   readonly config: LiveSessionConfig;
   readonly zone: PaceZone;
@@ -164,7 +171,11 @@ export class LiveSessionEngine {
   private startedAt = '';
   private status: LiveStatus = 'idle';
   private statusMessage: string | undefined;
+  /** The ghost replayed: the best take for this question, or else for this situation. */
   private ghost: PaceTake | null = null;
+  /** Best take for this exact question or story; "new best" is judged against this. */
+  private questionGhost: PaceTake | null = null;
+  private situationGhost: PaceTake | null = null;
   private trace: (number | null)[] = [];
   private coachSays: { text: string; untilMs: number } | null = null;
   /** Times Deepgram marked the end of an utterance: paragraph breaks. */
@@ -202,10 +213,15 @@ export class LiveSessionEngine {
     this.startedAt = new Date().toISOString();
 
     const key = ghostKey(this.config.storyId ?? this.config.prompt);
-    this.deps.ghostStore
-      ?.get(key)
-      .then((g) => (this.ghost = g ?? null))
-      .catch(() => {});
+    const store = this.deps.ghostStore;
+    const sitKey = situationGhostKey(this.config.situationId);
+    if (store) {
+      void (async () => {
+        this.questionGhost = (await store.get(key).catch(() => undefined)) ?? null;
+        this.situationGhost = sitKey ? ((await store.get(sitKey).catch(() => undefined)) ?? null) : null;
+        this.ghost = this.questionGhost ?? this.situationGhost;
+      })();
+    }
 
     const createClient = this.deps.createClient ?? ((keyterms, cb, clock) => new DeepgramLiveClient(keyterms, cb, { now: clock }));
     this.client = createClient(
@@ -384,8 +400,10 @@ export class LiveSessionEngine {
     const pauses = this.vad.getPauses().slice();
     const key = ghostKey(this.config.storyId ?? this.config.prompt);
     const take = summariseTake(key, takeId, this.trace, this.zone, countFillers(segments, this.fillers), nowMs);
-    const newBest = isBetterTake(take, this.ghost);
+    const newBest = isBetterTake(take, this.questionGhost);
     if (newBest) await this.deps.ghostStore?.put(take).catch(() => {});
+    const sitKey = situationGhostKey(this.config.situationId);
+    if (sitKey && isBetterTake(take, this.situationGhost)) await this.deps.ghostStore?.put({ ...take, key: sitKey }).catch(() => {});
 
     return {
       config: this.config,

@@ -3,7 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, Mic, Play, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { clock, durationWords, longDate, signed } from '@/lib/format';
-import { bestScores } from '@/lib/progress';
+import { bestScoresFor, personalBaseline } from '@/lib/personalBest';
+import { masteredSkills } from '@/lib/skills';
 import { Button } from '@/components/ui/button';
 import { Sonogram, type WordSegment } from '@/components/sonogram';
 import { TALK_TYPES } from '@/live/metrics/pace';
@@ -29,7 +30,7 @@ const MIN_WORDS = 20;
 const inFlight = new Set<string>();
 const tightenInFlight = new Set<string>();
 
-type Load = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; session: StoredSession; best: ReturnType<typeof bestScores>; previous: StoredSession | null };
+type Load = { status: 'loading' } | { status: 'missing' } | { status: 'ready'; session: StoredSession; best: ReturnType<typeof bestScoresFor>; previous: StoredSession | null };
 
 /** Field notes (`/notes/:id`): verdict, scores, the whole answer drawn, notes beside the transcript. */
 export function FieldNotesPage() {
@@ -41,7 +42,7 @@ export function FieldNotesPage() {
 
   const refresh = useCallback(async () => {
     const [session, all] = await Promise.all([getSession(id), listSessions()]);
-    setLoad(session ? { status: 'ready', session, best: bestScores(all, id), previous: previousTake(session, all) } : { status: 'missing' });
+    setLoad(session ? { status: 'ready', session, best: bestScoresFor(session, all), previous: previousTake(session, all) } : { status: 'missing' });
     return session;
   }, [id]);
 
@@ -82,7 +83,11 @@ export function FieldNotesPage() {
         await updateSession(session.id, { notesStatus: 'pending', notesError: undefined });
         await refresh();
         const story = session.config.storyId ? await getStory(session.config.storyId) : undefined;
-        const notes = await requestFieldNotesWithRetry(session, story, () => setRetrying(true));
+        const all = await listSessions().catch(() => []);
+        const notes = await requestFieldNotesWithRetry(session, story, () => setRetrying(true), undefined, {
+          masteredSkills: masteredSkills(all),
+          personalBest: personalBaseline(session, all),
+        });
         const updated = await updateSession(session.id, { notesStatus: 'ready', notes });
         if (updated && updated.segments.length >= MIN_WORDS) void tighten(updated);
       } catch (err) {
@@ -144,7 +149,7 @@ function FieldNotesView({
   onChange,
 }: {
   session: StoredSession;
-  best: ReturnType<typeof bestScores>;
+  best: ReturnType<typeof bestScoresFor>;
   previous: StoredSession | null;
   retrying: boolean;
   tightenPending: boolean;
@@ -272,6 +277,7 @@ function FieldNotesView({
         {notes ? (
           notes.oneFix ? (
             <>
+              {session.config.confidenceMode && <WentWell notes={notes} />}
               <div className="paper-scope flex flex-col gap-4 rounded-lg bg-paper p-7 text-paper-foreground sm:p-10">
                 <p className="m-0 text-label opacity-75">Your one fix for the next take</p>
                 <h1 className="m-0 max-w-[900px] font-display text-[clamp(36px,5vw,64px)] font-normal leading-[1.02] tracking-[-0.03em]">{notes.oneFix.instruction}</h1>
@@ -434,6 +440,27 @@ function FieldNotesView({
   );
 }
 
+/** Confidence mode: what went well comes before the one fix. */
+function WentWell({ notes }: { notes: FieldNotes }) {
+  const keeps = notes.notes.filter((n) => n.kind === 'keep').slice(0, 3);
+  return (
+    <div className="flex flex-col gap-3 rounded-lg bg-olive-soft p-7 sm:p-10" data-testid="went-well">
+      <p className="m-0 text-label">What went well</p>
+      {keeps.length ? (
+        <ul className="m-0 flex list-none flex-col gap-2 p-0">
+          {keeps.map((n) => (
+            <li key={n.title} className="font-display text-[clamp(24px,2.6vw,32px)] leading-[1.2]">
+              {n.title}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="m-0 font-display text-[clamp(24px,2.6vw,32px)] leading-[1.2]">You said it out loud, start to finish. That’s the hard part done.</p>
+      )}
+    </div>
+  );
+}
+
 function lowerFirst(s: string) {
   return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
 }
@@ -465,7 +492,7 @@ function NotesPending({ session, retrying, onRetry }: { session: StoredSession; 
   );
 }
 
-function Scores({ notes, best, session }: { notes: FieldNotes; best: ReturnType<typeof bestScores>; session: StoredSession }) {
+function Scores({ notes, best, session }: { notes: FieldNotes; best: ReturnType<typeof bestScoresFor>; session: StoredSession }) {
   const hit = notes.storyMap.sections.filter((s) => s.status === 'hit').length;
   const outline = notes.storyMap.sections.filter((s) => s.status !== null).length;
   const items = [
@@ -492,7 +519,7 @@ function Scores({ notes, best, session }: { notes: FieldNotes; best: ReturnType<
             <div className="flex flex-wrap items-baseline gap-3">
               <span className={cn('font-display text-metric', down && 'text-amber')}>{score}</span>
               {change !== null && (
-                <span className={cn('text-[15px] font-semibold', down ? 'text-amber' : 'text-olive')}>{change === 0 ? 'Matches your best' : `${signed(change)} on your best`}</span>
+                <span className={cn('text-[15px] font-semibold', down ? 'text-amber' : 'text-olive')}>{change === 0 ? `Matches your best on this ${best!.scope}` : `${signed(change)} on your best on this ${best!.scope}`}</span>
               )}
             </div>
             <p className="m-0 mt-2.5 text-lg font-semibold">{it.label}</p>

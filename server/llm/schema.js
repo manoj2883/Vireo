@@ -43,6 +43,8 @@ export const NaturalPhrasingSchema = z.object({
   natural: z.string().min(1),
   /** One plain sentence. */
   why: z.string().min(1),
+  /** The kind of change, so repeated patterns can be grouped across sessions. */
+  category: z.enum(['tense', 'article', 'preposition', 'word_order', 'plural', 'agreement', 'word_choice', 'idiom', 'other']),
 });
 
 /**

@@ -50,11 +50,13 @@ function LiveSession({ config }: { config: SessionConfig }) {
       if (cancelled) return;
       const keyterms = mergeKeyterms(custom, buildKeyterms({ prompt: config.prompt, storyTitle: story?.title, keyPoints: story?.keyPoints }));
       e = new LiveSessionEngine(
-        { mode: config.mode, talkType: config.talkType, prompt: config.prompt, storyId: config.storyId, keyterms, calibration: config.calibration },
+        { mode: config.mode, talkType: config.talkType, prompt: config.prompt, storyId: config.storyId, situationId: config.situationId, keyterms, calibration: config.calibration },
         { ghostStore: { get: getGhost, put: putGhost } }
       );
       setEngine(e);
-      await e.start(videoRef.current ?? undefined);
+      // Confidence mode's first take is camera-off: no camera is opened at all.
+      const cameraOff = Boolean(config.confidenceMode && !config.retake);
+      await e.start(cameraOff ? undefined : videoRef.current ?? undefined);
     })().catch((err: unknown) => {
       const name = err instanceof DOMException ? err.name : '';
       setStartError(
@@ -104,7 +106,10 @@ function LiveView({
   const faceId = useId();
   const capId = useId();
 
-  const rushing = snap.nudge === 'fast';
+  /** Confidence mode: the HUD is the pause ring only, and the first take has no camera. */
+  const calm = Boolean(config.confidenceMode);
+  const cameraOff = calm && !config.retake;
+  const rushing = !calm && snap.nudge === 'fast';
   const failed = startError ?? (snap.status === 'failed' ? snap.statusMessage ?? 'The live connection failed.' : null);
   const sinceFiller = snap.lastFiller ? snap.elapsedMs - snap.lastFiller.atMs : null;
 
@@ -190,9 +195,14 @@ function LiveView({
             playsInline
             autoPlay
             aria-label="Your camera"
-            className={cn('absolute inset-0 h-full w-full -scale-x-100 object-cover', hideFace && 'invisible')}
+            className={cn('absolute inset-0 h-full w-full -scale-x-100 object-cover', (hideFace || cameraOff) && 'invisible')}
           />
-          {hideFace && (
+          {cameraOff && (
+            <div className="absolute inset-x-0 top-0 bottom-[220px] flex items-center justify-center px-6 text-center" data-testid="camera-off">
+              <p className="m-0 max-w-[480px] font-display text-[26px] italic text-ink-muted">Camera off for this first take. Just you and your voice.</p>
+            </div>
+          )}
+          {hideFace && !cameraOff && (
             <div className="absolute inset-x-0 top-0 bottom-[260px] flex items-center justify-center px-6 text-center">
               <p className="m-0 font-display text-[26px] italic text-ink-muted">Your face is hidden. Vireo still sees you.</p>
             </div>
@@ -209,7 +219,7 @@ function LiveView({
           )}
 
           <div className="absolute left-4 top-4 flex flex-wrap items-center gap-2 sm:left-7 sm:top-7">
-            <EyeContactDot eyeContact={snap.eyeContact} />
+            {!calm && <EyeContactDot eyeContact={snap.eyeContact} />}
             {leftMs !== null && (
               <span
                 role="timer"
@@ -231,27 +241,35 @@ function LiveView({
             </div>
           )}
 
-          <FillerTicker
-            className="absolute right-4 top-4 sm:right-7 sm:top-7"
-            count={snap.fillerCount}
-            sinceLastMs={sinceFiller}
-            lastFiller={snap.lastFiller?.text}
-          />
+          {!calm && (
+            <FillerTicker
+              className="absolute right-4 top-4 sm:right-7 sm:top-7"
+              count={snap.fillerCount}
+              sinceLastMs={sinceFiller}
+              lastFiller={snap.lastFiller?.text}
+            />
+          )}
 
           <div className="absolute inset-x-0 bottom-0 flex flex-col gap-[18px] bg-gradient-to-b from-surface-100/0 via-surface-100/95 to-surface-100 px-4 pb-6 pt-16 sm:px-8 sm:pb-7">
-            {captions && (
+            {captions && !calm && (
               <LiveCaptions
                 captions={snap.captions}
                 placeholder={snap.status === 'connected' ? 'Start speaking when you’re ready.' : 'Getting ready'}
               />
             )}
             <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:gap-8">
-              <div className="flex min-w-0 flex-1 flex-col gap-3.5">
-                <div className="h-[96px] sm:h-[120px]">
-                  <Sonogram mode="scrolling" segments={snap.segments} pauses={snap.pauses} tentativeFillers={snap.likelyFillers} nowMs={snap.elapsedMs} label="Your speech in the last six seconds" />
+              {calm ? (
+                <p className="m-0 min-w-0 flex-1 text-[16px] text-ink-muted" data-testid="calm-hud">
+                  Confidence mode: just the pause ring. Take your time; a pause is always fine.
+                </p>
+              ) : (
+                <div className="flex min-w-0 flex-1 flex-col gap-3.5">
+                  <div className="h-[96px] sm:h-[120px]">
+                    <Sonogram mode="scrolling" segments={snap.segments} pauses={snap.pauses} tentativeFillers={snap.likelyFillers} nowMs={snap.elapsedMs} label="Your speech in the last six seconds" />
+                  </div>
+                  <PaceBand wpm={snap.wpm} zone={snap.zone} ghostWpm={snap.ghostWpm} rushing={rushing} />
                 </div>
-                <PaceBand wpm={snap.wpm} zone={snap.zone} ghostWpm={snap.ghostWpm} rushing={rushing} />
-              </div>
+              )}
               <PauseRing pausingMs={snap.pausingMs} className="self-center sm:self-auto" />
             </div>
           </div>
@@ -263,10 +281,12 @@ function LiveView({
               <Switch id={faceId} checked={hideFace} onCheckedChange={setHideFace} />
               Hide my face
             </label>
-            <label htmlFor={capId} className="inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-pill bg-surface-100 px-[18px] text-label">
-              <Switch id={capId} checked={captions} onCheckedChange={setCaptions} />
-              Live captions
-            </label>
+            {!calm && (
+              <label htmlFor={capId} className="inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-pill bg-surface-100 px-[18px] text-label">
+                <Switch id={capId} checked={captions} onCheckedChange={setCaptions} />
+                Live captions
+              </label>
+            )}
             {config.retake?.script && (
               <label htmlFor={promptId} className="inline-flex min-h-12 cursor-pointer items-center gap-2.5 rounded-pill bg-surface-100 px-[18px] text-label">
                 <Switch id={promptId} checked={teleprompter} onCheckedChange={setTeleprompter} />

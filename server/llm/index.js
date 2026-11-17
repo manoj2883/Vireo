@@ -7,6 +7,7 @@ import { describeError, withRetry } from './retry.js';
 import { extractJson } from './json.js';
 import { TIGHTEN_SYSTEM, TightenSchema, buildTightenPrompt, validateTightened } from './tighten.js';
 import { INTERVIEW_SYSTEM, InterviewSchema, buildInterviewPrompt, validateInterview } from './interview.js';
+import { sanitizeMastered } from './context.js';
 
 export const PROVIDERS = ['gemini', 'openrouter', 'anthropic'];
 
@@ -193,6 +194,7 @@ export async function generateStructured(task, opts = {}) {
  * @param {Parameters<typeof generateStructured>[1]} [opts]
  */
 export async function generateTeardown(transcript, context = {}, opts = {}) {
+  const mastered = sanitizeMastered(context.masteredSkills);
   const r = await generateStructured(
     {
       label: 'field-notes',
@@ -200,7 +202,14 @@ export async function generateTeardown(transcript, context = {}, opts = {}) {
       system: FIELD_NOTES_SYSTEM,
       user: buildFieldNotesPrompt(transcript, context),
       schema: FieldNotesSchema,
-      validate: validateReply,
+      // Skill memory is enforced, not just asked for: a mastered skill as the one fix is sent back.
+      validate: (text) => {
+        const v = validateReply(text);
+        if (v.data && mastered.includes(v.data.oneFix.targetMetric)) {
+          return { problem: `the one fix targets ${v.data.oneFix.targetMetric}, which the speaker has already mastered. Choose a different one fix.` };
+        }
+        return v;
+      },
     },
     opts
   );

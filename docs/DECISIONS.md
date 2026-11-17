@@ -45,3 +45,19 @@ Product decisions the build spec didn't cover, with the reasoning. Newest at the
 **D19. Interview turns share the write limit.** Each turn is one model call, so it counts against the same per-visitor and per-IP hourly write limits as field notes, rather than adding a new limit and env var. A full interview is about 7 to 10 turns.
 
 **D20. Interview slots are quotes; the script is checked like the tightened answer.** Each of the seven slots must be copied exactly from the speaker's answers or it's emptied. The 30-second script may use only the speaker's words plus linking words, at most 90 words (about 30 s at 150 wpm). A script that fails gets one repair round, then the turn fails and the answer stays in the box.
+
+## Phase 3
+
+**D21. A skill is a fix's target measure.** The five measurable targets from fix adoption are the skills. Fixes marked not measurable can't be adopted, so they don't count toward any skill.
+
+**D22. "Across at least 2 sessions" means 2 different questions.** Every retake is its own session, so counting sessions would let one answer, memorised, master a skill. Mastery needs its adoptions to come from at least two retake series.
+
+**D23. Mastery is enforced on the server.** The prompt is told the mastered skills, and `generateTeardown` also sends back any reply whose one fix targets one, with a repair message. A model can't quietly ignore skill memory.
+
+**D24. Personal best: the same question first, then the same situation.** "Best" uses ghost pace's rule (most time in zone, then fewest fillers). Only earlier sessions count, so a take is never compared with itself or the future. Ghost pace stores a second best per situation (`situation:<id>`) so a new question still races your own best. Deleting a session deletes both, since they share its take id.
+
+**D25. The weekly plan is a snapshot.** It's built from data alone (weakest practising skills by recent adoption rate, then skills not yet started; eye contact only once the camera has been used) and stored per ISO week, so it doesn't reshuffle mid-week as sessions come in. The week number rotates which drill each skill gets.
+
+**D26. Phrasing categories: the classifier wins when it's sure.** Article, preposition, tense, plural and word-order changes are clear from the words alone; then the classifier's answer beats the model's label. Otherwise the model's `category` is used. A pattern must appear at least twice to show. It lives on Home under "Speaking English with confidence", the situation's own name, because the app has no separate view for it.
+
+**D27. Confidence mode details.** Breathing is 4 s in and 6 s out for 60 s, skippable. "Camera-off first take" means the camera is never opened on a take that isn't a retake; retakes in confidence mode use the camera as normal. The HUD keeps the pause ring and, for timed pitches, the countdown (it's the limit, not feedback). Live captions and the rushing glow are hidden. Coach mode's spoken nudges follow the user's own coaching choice.

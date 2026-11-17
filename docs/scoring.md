@@ -10,7 +10,7 @@ Every score and headline number in Vireo has a “How this was scored” note un
 
 **How.** A 0 to 100 judgement by the field notes model, reading your transcript against the situation’s criteria (and your Story Bank outline, if you chose one).
 
-**Target.** Your best earlier structure score. *Source:* Your own sessions on this device.
+**Target.** Your best earlier structure score on this question (or, failing that, this situation). *Source:* Your own sessions on this device.
 
 **Accuracy.** Scored by the field notes model. This is a model’s judgement, not a measurement, so it has no accuracy figure.
 
@@ -20,7 +20,7 @@ Every score and headline number in Vireo has a “How this was scored” note un
 
 **How.** A 0 to 100 judgement by the field notes model, given the pace, filler and pause numbers measured on your device.
 
-**Target.** Your best earlier delivery score. *Source:* Your own sessions on this device.
+**Target.** Your best earlier delivery score on this question (or, failing that, this situation). *Source:* Your own sessions on this device.
 
 **Accuracy.** Scored by the field notes model. This is a model’s judgement, not a measurement, so it has no accuracy figure.
 
@@ -30,7 +30,7 @@ Every score and headline number in Vireo has a “How this was scored” note un
 
 **How.** A 0 to 100 judgement by the field notes model, reading your transcript.
 
-**Target.** Your best earlier clarity score. *Source:* Your own sessions on this device.
+**Target.** Your best earlier clarity score on this question (or, failing that, this situation). *Source:* Your own sessions on this device.
 
 **Accuracy.** Scored by the field notes model. This is a model’s judgement, not a measurement, so it has no accuracy figure.
 

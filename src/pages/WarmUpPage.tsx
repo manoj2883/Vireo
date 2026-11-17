@@ -13,6 +13,7 @@ import { DemoResting } from '@/components/DemoResting';
 import { useDemoHealth } from '@/lib/health';
 import { ContextStep } from '@/components/warmup/ContextStep';
 import { cleanContext } from '@/session/speakingContext';
+import { BreathingWarmUp } from '@/components/warmup/BreathingWarmUp';
 
 type Source = SituationId | 'own' | 'story';
 const ALL_QUESTIONS = SITUATIONS.flatMap((x) => x.questions);
@@ -48,10 +49,12 @@ export function WarmUpPage() {
     return { ...base, ...fromUrl, ...(preset ?? {}) };
   });
   const [stories, setStories] = useState<StoredStory[]>([]);
+  /** Confidence mode: a minute of guided breathing between the warm-up and the first take. */
+  const [breathing, setBreathing] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const { state: preview, levels } = usePreviewMedia(videoRef);
   const [calibrating, setCalibrating] = useState<'idle' | 'running' | 'done' | 'failed'>(() => (loadConfig()?.calibration ? 'done' : 'idle'));
-  const ids = { source: useId(), question: useId(), prompt: useId(), mode: useId(), audience: useId(), story: useId(), face: useId(), privacy: useId() };
+  const ids = { source: useId(), question: useId(), prompt: useId(), mode: useId(), audience: useId(), story: useId(), face: useId(), privacy: useId(), calm: useId() };
 
   /** Two seconds of looking at the camera: where "eye contact" is for you, and your usual posture. */
   async function calibrateCamera() {
@@ -109,8 +112,11 @@ export function WarmUpPage() {
   function start() {
     if (!canStart) return;
     saveConfig({ ...config, prompt: config.prompt.trim(), context: cleanContext(config.context) });
-    navigate('/session');
+    if (config.confidenceMode && !config.retake) setBreathing(true);
+    else navigate('/session');
   }
+
+  if (breathing) return <BreathingWarmUp onDone={() => navigate('/session')} />;
 
   const sources: { id: Source; title: string; body: string }[] = [
     ...SITUATIONS.map((x) => ({ id: x.id, title: x.label, body: x.blurb })),
@@ -294,6 +300,16 @@ export function WarmUpPage() {
               })}
             </div>
           </fieldset>
+
+          <div className="flex items-center justify-between gap-4 border-t border-line py-5">
+            <label htmlFor={ids.calm} className="flex cursor-pointer flex-col gap-1">
+              <span className="text-lg font-semibold">Confidence mode</span>
+              <span className="text-[15px] text-ink-muted">
+                A minute of slow breathing first, your camera off for the first take, only the pause ring on screen, and notes that start with what went well.
+              </span>
+            </label>
+            <Switch id={ids.calm} checked={Boolean(config.confidenceMode)} onCheckedChange={(v) => set('confidenceMode', v || undefined)} />
+          </div>
 
           <div className="flex items-center justify-between gap-4 border-y border-line py-5">
             <label htmlFor={ids.audience} className="flex cursor-pointer flex-col gap-1">

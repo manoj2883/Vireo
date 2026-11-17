@@ -84,7 +84,7 @@ export const SCORE_EXPLANATIONS: Record<ScoreId, ScoreExplanation> = {
             { label: 'Story Bank outline', value: session.config.storyId ? 'Yes' : 'None chosen' },
           ]
         : [],
-    target: () => ({ text: 'Your best earlier structure score.', source: 'Your own sessions on this device.' }),
+    target: () => ({ text: 'Your best earlier structure score on this question (or, failing that, this situation).', source: 'Your own sessions on this device.' }),
     accuracy: { kind: 'model' },
   },
   delivery: {
@@ -100,7 +100,7 @@ export const SCORE_EXPLANATIONS: Record<ScoreId, ScoreExplanation> = {
             { label: 'Pauses', value: `${oneDecimal(session.metrics.pausesPerMin)} a minute` },
           ]
         : [],
-    target: () => ({ text: 'Your best earlier delivery score.', source: 'Your own sessions on this device.' }),
+    target: () => ({ text: 'Your best earlier delivery score on this question (or, failing that, this situation).', source: 'Your own sessions on this device.' }),
     accuracy: { kind: 'model' },
   },
   clarity: {
@@ -109,7 +109,7 @@ export const SCORE_EXPLANATIONS: Record<ScoreId, ScoreExplanation> = {
     measures: 'How concrete, precise and easy to follow the answer was.',
     formula: 'A 0 to 100 judgement by the field notes model, reading your transcript.',
     inputs: ({ session }) => (session ? [{ label: 'Words heard', value: String(session.metrics.wordCount) }] : []),
-    target: () => ({ text: 'Your best earlier clarity score.', source: 'Your own sessions on this device.' }),
+    target: () => ({ text: 'Your best earlier clarity score on this question (or, failing that, this situation).', source: 'Your own sessions on this device.' }),
     accuracy: { kind: 'model' },
   },
   fillersPerMin: {

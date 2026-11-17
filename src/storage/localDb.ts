@@ -6,6 +6,7 @@ import type { PauseSpan, WordSegment } from '@/components/sonogram/types';
 import type { SessionConfig } from '@/session/config';
 import type { FieldNotes } from '@/types/fieldNotes';
 import type { CameraResult } from '@/vision/cameraTracker';
+import type { WeeklyPlan } from '@/lib/weeklyPlan';
 
 /**
  * On-device storage. Nothing here leaves the device; no video is ever stored.
@@ -68,7 +69,7 @@ export interface VireoLocalDB extends DBSchema {
 }
 
 /** A per-user setting, kept on this device. */
-export type StoredSetting = { key: 'customTerms'; value: string[] };
+export type StoredSetting = { key: 'customTerms'; value: string[] } | { key: 'weeklyPlan'; value: WeeklyPlan };
 
 export const LOCAL_DB_NAME = 'vireo-local';
 export const LOCAL_DB_VERSION = 3;
@@ -184,7 +185,18 @@ export async function deleteStory(id: string): Promise<void> {
 
 /** "Words Vireo should know": the user's name, company and terms, sent to the transcriber as keyterms. */
 export async function getCustomTerms(): Promise<string[]> {
-  return (await (await getLocalDb()).get('settings', 'customTerms'))?.value ?? [];
+  const s = await (await getLocalDb()).get('settings', 'customTerms');
+  return s?.key === 'customTerms' ? s.value : [];
+}
+
+/** This week's plan: the stored one if it's for this week, otherwise a fresh one, stored. */
+export async function weeklyPlanFor(build: () => WeeklyPlan | null, week: string): Promise<WeeklyPlan | null> {
+  const db = await getLocalDb();
+  const stored = await db.get('settings', 'weeklyPlan');
+  if (stored?.key === 'weeklyPlan' && stored.value.week === week && stored.value.drills.length) return stored.value;
+  const plan = build();
+  if (plan?.drills.length) await db.put('settings', { key: 'weeklyPlan', value: plan });
+  return plan;
 }
 
 export async function saveCustomTerms(terms: string[]): Promise<void> {

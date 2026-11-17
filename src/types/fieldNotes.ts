@@ -30,12 +30,16 @@ export interface Drill {
   minutes: number;
 }
 
+export type PhrasingCategory = 'tense' | 'article' | 'preposition' | 'word_order' | 'plural' | 'agreement' | 'word_choice' | 'idiom' | 'other';
+
 export interface NaturalPhrasing {
   /** Verbatim from the transcript. */
   original: string;
   /** How a native American English speaker would say it. */
   natural: string;
   why: string;
+  /** The model's label for the kind of change. Absent in older notes. */
+  category?: PhrasingCategory;
 }
 
 export type BeatKind = 'hook' | 'stakes' | 'turn' | 'payoff' | 'landing';

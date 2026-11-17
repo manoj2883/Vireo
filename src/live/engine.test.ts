@@ -12,7 +12,7 @@ function timed(text: string, fromMs: number, toMs: number): LiveWord[] {
   return parts.map((t, i) => ({ text: t, startMs: fromMs + i * step, endMs: fromMs + (i + 1) * step - 20 }));
 }
 
-function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
+function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake, opts: { situationId?: string; store?: Record<string, PaceTake> } = {}) {
   let clock = 0;
   let media!: MediaStartArgs;
   let sttCb!: SttCallbacks;
@@ -28,7 +28,7 @@ function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
   };
   const vision = { live: vi.fn(() => ({ looking: false, awayMs: 3500, dim: true })), result: vi.fn(() => cameraResult), stop: vi.fn() };
   const engine = new LiveSessionEngine(
-    { mode, talkType: 'interview', prompt: 'Tell me about your research.', keyterms: ['DiabEvidence', 'claim-checking judge'] },
+    { mode, talkType: 'interview', prompt: 'Tell me about your research.', situationId: opts.situationId, keyterms: ['DiabEvidence', 'claim-checking judge'] },
     {
       now: () => clock,
       autoTick: false,
@@ -47,7 +47,7 @@ function harness(mode: 'watch' | 'coach' = 'coach', ghost?: PaceTake) {
           stop: vi.fn(async () => {}),
         };
       },
-      ghostStore: { get: async () => ghost, put: async (t) => void saved.push(t) },
+      ghostStore: { get: async (k) => (opts.store ? opts.store[k] : ghost), put: async (t) => void saved.push(t) },
       startVision: async () => vision,
     }
   );
@@ -259,6 +259,22 @@ describe('LiveSessionEngine', () => {
     await Promise.resolve();
     h.advance(1000, false);
     expect(h.engine.getSnapshot().ghostWpm).toBe(150);
+  });
+
+  it('falls back to the best take for the situation, and saves a new best for both', async () => {
+    const sit: PaceTake = { key: 'situation:interview', takeId: 's', createdAt: '', trace: [120, 120], avgWpm: 120, inZoneRatio: 0.1, fillersPerMin: 9 };
+    const h = harness('watch', undefined, { situationId: 'interview', store: { 'situation:interview': sit } });
+    await h.start();
+    await new Promise((r) => setTimeout(r, 0));
+    h.advance(1000, false);
+    expect(h.engine.getSnapshot().ghostWpm).toBe(120);
+    for (let i = 0; i < 40; i++) {
+      h.advance(400, true);
+      h.say('word', h.engine.elapsed() - 390, h.engine.elapsed() - 20);
+    }
+    const result = await h.engine.end();
+    expect(result.newBest).toBe(true);
+    expect(h.saved.map((t) => t.key)).toEqual(['tell me about your research', 'situation:interview']);
   });
 
   it('ends with transcript lines, metrics and a saved best take', async () => {

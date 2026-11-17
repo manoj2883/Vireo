@@ -31,3 +31,18 @@ describe('speaking context', () => {
     expect(TIGHTEN_SYSTEM).toContain(CONTEXT_RULE);
   });
 });
+
+describe('skill memory and personal best in the prompt', () => {
+  it('lists mastered skills, the personal best and confidence mode', () => {
+    const prompt = buildFieldNotesPrompt(lines, {
+      masteredSkills: ['fillers_per_min', 'nonsense'],
+      personalBest: { scope: 'situation', fillersPerMin: 1.24, timeInZonePct: 70, sessionId: 'x' },
+      confidenceMode: true,
+    });
+    expect(prompt).toContain("Mastered skills (never the one fix's targetMetric): fillers_per_min");
+    expect(prompt).not.toContain('nonsense');
+    expect(prompt).toContain('personal best on this situation: {"fillersPerMin":1.2,"timeInZonePct":70}');
+    expect(prompt).toContain('Confidence mode is on');
+    expect(FIELD_NOTES_SYSTEM).toMatch(/never push them toward a single 'correct' voice/);
+  });
+});
