@@ -69,3 +69,13 @@ Product decisions the build spec didn't cover, with the reasoning. Newest at the
 **D29. Uploads use Deepgram's pre-recorded API with a temporary token.** Deepgram's docs say temporary tokens work for pre-recorded `/listen` requests, so the browser decodes the file, encodes a 16 kHz mono WAV (about 29 MB for 15 minutes) and posts it straight to Deepgram. The Vercel function only grants the token, which counts as one session against the usage limits. Not yet tried from a real browser: if Deepgram's CORS refused it, the fallback would be streaming the decoded audio through the live socket.
 
 **D30. Uploads don't set ghost pace.** An uploaded talk is a real event, not a rehearsal of a question, so it doesn't replace the best take that ghost pace replays.
+
+**D31. One live session for the whole conversation.** Opening a new transcription socket per answer would count every turn as a session against the limits and add a connection delay each time. Instead one session runs throughout, and words are kept only if they start inside an answer window (from the end of the partner's question to "Done answering"). Metrics are measured over answering time only.
+
+**D32. Partner questions must quote the speaker.** Every follow-up's `basedOn` must be exact words from the last answer (or, in Q&A, from the talk). A question that isn't grounded gets one repair round, so the partner never questions a claim the speaker didn't make. Only a roleplay's opening question may stand alone.
+
+**D33. The partner's voice is made on the server.** The server already holds the Deepgram key, so it returns a short Aura-2 MP3 with each question (base64, well under Vercel's body limit). If that fails, the browser's own voice says it. The partner voice is `ROLEPLAY_VOICE` (default `aura-2-thalia-en`, the coach clips' voice).
+
+**D34. Partner turns have their own daily cap.** Each turn is a model call plus speech, so it counts against the visitor's write limits (shared counters with field notes) and a site-wide `DAILY_ROLEPLAY_TURN_CAP` (default 600). The conversation's transcription socket counts as one session.
+
+**D35. Q&A is a roleplay mode.** "Take questions" reuses the partner page with a tough audience member, three questions, and the talk's transcript as the source the questions must quote. It's offered on every talk's field notes and highlighted after a final big-day rehearsal.

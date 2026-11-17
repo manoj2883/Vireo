@@ -3,6 +3,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { generateTeardown, generateTightened, generateInterviewTurn, describeProvider, TeardownError } from './llm/index.js';
 import { sanitizeTurns } from './llm/interview.js';
+import { sanitizeRoleplay, verifyAnswers } from './llm/roleplay.js';
+import { generateRoleplayTurn } from './llm/index.js';
+import { synthesizeSpeech, DEFAULT_PARTNER_VOICE } from './tts.js';
 import { verifyNotes, verifyPhrasing, verifyPreviousFix } from './llm/evidence.js';
 import { FIX_DIRECTIONS } from './llm/schema.js';
 import { sanitizeSpeakingContext } from './llm/context.js';
@@ -16,7 +19,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * The HTTP API: transcription tokens, field notes and health, plus the built front end.
  * `generate` is injectable so the field notes route can be tested without a model.
  */
-export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, interview = generateInterviewTurn, grantToken = grantSttToken, fetchImpl = fetch, log = console, limiter } = {}) {
+export function createApp({ env = process.env, generate = generateTeardown, tighten = generateTightened, interview = generateInterviewTurn, roleplay = generateRoleplayTurn, speak = synthesizeSpeech, grantToken = grantSttToken, fetchImpl = fetch, log = console, limiter } = {}) {
   const limits = limiter ?? createLimiter({ env });
   if (env.VERCEL && limits.backend === 'memory') {
     log.warn('[limits] Upstash Redis is not configured, so usage limits are per function instance. Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN.');
@@ -81,6 +84,7 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
       // The story coach's beats and landing lines get the same evidence check as notes.
       const beats = verifyStoryBeats(result.notes.storyBeats, lines);
       const landing = verifyLanding(result.notes.landing, lines);
+      const answered = verifyAnswers(result.notes.answers, lines);
       if (beats.dropped || landing.dropped) log.warn(`[field-notes] Dropped ${beats.dropped} story beats and ${landing.dropped} landing lines that failed the evidence check.`);
       res.json({
         sessionId: sessionId || 'sess_' + Date.now(),
@@ -98,6 +102,8 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
         landing: landing.landing,
         droppedBeats: beats.dropped,
         droppedLandingLines: landing.dropped,
+        answers: answered.answers,
+        droppedAnswers: answered.dropped,
       });
     } catch (err) {
       const status = err instanceof TeardownError ? err.status : 500;
@@ -139,6 +145,23 @@ export function createApp({ env = process.env, generate = generateTeardown, tigh
     } catch (err) {
       const status = err instanceof TeardownError ? err.status : 500;
       log.error('[Server /api/story-interview Error]:', err.message);
+      res.status(status).json({ error: err.message, provider: err.provider });
+    }
+  });
+
+  // Roleplay partner and Q&A: the next question, grounded in what the speaker said, plus its audio.
+  app.post('/api/roleplay/next', limit('roleplay'), async (req, res) => {
+    const r = sanitizeRoleplay(req.body);
+    if (r.turns.length >= r.maxTurns) return res.status(400).json({ error: 'That conversation is already finished.' });
+    if (r.mode === 'qa' && r.source.split(/\s+/).filter(Boolean).length < 20) return res.status(400).json({ error: 'Questions need a talk of at least 20 words to draw on.' });
+    try {
+      const turn = await roleplay(r);
+      const voice = env.ROLEPLAY_VOICE || DEFAULT_PARTNER_VOICE;
+      const audio = await speak(turn.question, { apiKey: env.DEEPGRAM_API_KEY, voice, fetchImpl, log });
+      res.json({ question: turn.question, basedOn: turn.basedOn, audio, audioType: audio ? 'audio/mpeg' : null, provider: turn.provider, model: turn.model });
+    } catch (err) {
+      const status = err instanceof TeardownError ? err.status : 500;
+      log.error('[Server /api/roleplay/next Error]:', err.message);
       res.status(status).json({ error: err.message, provider: err.provider });
     }
   });

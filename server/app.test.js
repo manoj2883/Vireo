@@ -256,3 +256,38 @@ describe('POST /api/story-interview', () => {
     expect(interview).not.toHaveBeenCalled();
   });
 });
+
+describe('POST /api/roleplay/next', () => {
+  const body = { role: 'investor', prompt: 'Pitch it.', maxTurns: 3, turns: [{ question: 'What do you do?', answer: 'We cut wait times.' }] };
+
+  it('returns the next question with the partner’s voice, and the browser voice when TTS fails', async () => {
+    const roleplay = vi.fn().mockResolvedValue({ question: 'By how much?', basedOn: 'cut wait times', provider: 'fake', model: 'f' });
+    const speak = vi.fn().mockResolvedValueOnce('AQID').mockResolvedValueOnce(null);
+    const { base } = await start({ roleplay, speak });
+    const post = (b) => fetch(`${base}/api/roleplay/next`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+    expect(await post(body)).toMatchObject({ status: 200, body: { question: 'By how much?', basedOn: 'cut wait times', audio: 'AQID', audioType: 'audio/mpeg' } });
+    expect(roleplay).toHaveBeenCalledWith(expect.objectContaining({ role: 'investor', maxTurns: 3, turns: [{ question: 'What do you do?', answer: 'We cut wait times.' }] }));
+    expect((await post(body)).body).toMatchObject({ audio: null, audioType: null });
+  });
+
+  it('refuses a finished conversation and a Q&A without a talk', async () => {
+    const roleplay = vi.fn();
+    const { base } = await start({ roleplay });
+    const post = (b) => fetch(`${base}/api/roleplay/next`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) }).then((r) => r.status);
+    expect(await post({ ...body, turns: Array.from({ length: 3 }, () => body.turns[0]) })).toBe(400);
+    expect(await post({ mode: 'qa', source: 'too short' })).toBe(400);
+    expect(roleplay).not.toHaveBeenCalled();
+  });
+
+  it('evidence-checks the per-answer notes in a roleplay’s field notes', async () => {
+    const answers = [
+      { questionIndex: 1, addressed: 'fully', note: 'Direct.', quote: 'teaching AI systems to say no' },
+      { questionIndex: 2, addressed: 'not', note: 'Invented.', quote: 'we raised ten million' },
+    ];
+    const generate = vi.fn().mockResolvedValue({ notes: { ...structuredClone(NOTES), answers }, provider: 'fake', model: 'fake-1', attempts: 1 });
+    const { post } = await start({ generate });
+    const res = (await post({ transcript: TRANSCRIPT })).body;
+    expect(res.answers).toEqual([answers[0]]);
+    expect(res.droppedAnswers).toBe(1);
+  });
+});

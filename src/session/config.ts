@@ -3,6 +3,7 @@ import type { TalkType } from '@/live/metrics/pace';
 import type { Calibration } from '@/vision/cameraTracker';
 import type { SituationId } from './situations';
 import type { SpeakingContext } from './speakingContext';
+import type { PartnerSetup } from '@/roleplay/conversation';
 
 /** Everything the warm-up decides for a session. */
 export interface SessionConfig {
@@ -23,6 +24,8 @@ export interface SessionConfig {
   retake?: { fromSessionId: string; oneFix: string; script?: string };
   /** A drill to show during the take (from a reminder link or Home). */
   drill?: string;
+  /** Practise with a partner (roleplay) or take questions after a talk (Q&A). */
+  partner?: PartnerSetup;
   /** The last rehearsal before the big day: after the take, Vireo offers tough questions first. */
   takeQuestions?: boolean;
   /** Confidence mode: breathing warm-up, camera-off first take, pause ring only, notes lead with what went well. */

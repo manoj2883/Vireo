@@ -7,6 +7,7 @@ import type { SessionConfig } from '@/session/config';
 import type { FieldNotes } from '@/types/fieldNotes';
 import type { CameraResult } from '@/vision/cameraTracker';
 import type { WeeklyPlan } from '@/lib/weeklyPlan';
+import type { PartnerMode, PartnerRole, PartnerTurn } from '@/roleplay/conversation';
 
 /**
  * On-device storage. Nothing here leaves the device; no video is ever stored.
@@ -37,6 +38,8 @@ export interface StoredSession {
   camera?: CameraResult | null;
   /** Retakes of the same question form a series; this is the first take's id. */
   retakeOf?: string;
+  /** A conversation with a partner: who, and each question with when it was asked and answered. */
+  roleplay?: { mode: PartnerMode; role: PartnerRole; turns: PartnerTurn[]; sourceSessionId?: string };
   /** Where the audio came from: a live session (the default) or an uploaded recording. */
   source?: 'live' | 'recording';
   /** "Your answer, tightened": the rewrite of what was said, checked against the transcript. */

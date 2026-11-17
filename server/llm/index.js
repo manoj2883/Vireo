@@ -8,6 +8,7 @@ import { extractJson } from './json.js';
 import { TIGHTEN_SYSTEM, TightenSchema, buildTightenPrompt, validateTightened } from './tighten.js';
 import { INTERVIEW_SYSTEM, InterviewSchema, buildInterviewPrompt, validateInterview } from './interview.js';
 import { sanitizeMastered } from './context.js';
+import { ROLEPLAY_SYSTEM, RoleplayTurnSchema, buildRoleplayPrompt, validateRoleplay } from './roleplay.js';
 
 export const PROVIDERS = ['gemini', 'openrouter', 'anthropic'];
 
@@ -252,6 +253,25 @@ export async function generateInterviewTurn(input, opts = {}) {
       user: buildInterviewPrompt(input),
       schema: InterviewSchema,
       validate: (text) => validateInterview(text, input.turns),
+    },
+    opts
+  );
+  return { ...r.data, provider: r.provider, model: r.model };
+}
+
+/**
+ * One roleplay or Q&A turn: the partner's next question, grounded in the speaker's own words.
+ * @param {ReturnType<typeof import('./roleplay.js').sanitizeRoleplay>} input
+ */
+export async function generateRoleplayTurn(input, opts = {}) {
+  const r = await generateStructured(
+    {
+      label: 'roleplay',
+      noun: 'partner questions',
+      system: ROLEPLAY_SYSTEM,
+      user: buildRoleplayPrompt(input),
+      schema: RoleplayTurnSchema,
+      validate: (text) => validateRoleplay(text, input),
     },
     opts
   );

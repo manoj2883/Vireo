@@ -44,8 +44,8 @@ PR: [#18](https://github.com/manoj2883/Vireo/pull/18), merged with CI green.
 
 | Feature | Status | Notes |
 | :--- | :--- | :--- |
-| 4.1 Roleplay partner | in progress | |
-| 4.2 Hostile Q&A drill | not started | Planned on the same machinery as 4.1 (role "tough audience member", 3 turns, source = the talk). |
+| 4.1 Roleplay partner | done | Warm-up "Practise with a partner" (role, 3–6 questions) → `/roleplay` (`RoleplayPage`): one live session for the whole conversation, no camera; partner questions from `POST /api/roleplay/next` (`server/llm/roleplay.js`, `basedOn` must quote the last answer), spoken with Deepgram Aura-2 (`server/tts.js`) or the browser's voice. Words heard while the partner speaks are dropped (`src/roleplay/conversation.ts`). Field notes cover the whole conversation plus `answers` (addressed fully/partly/not, quoted, evidence-checked). New `roleplay` limit kind: `DAILY_ROLEPLAY_TURN_CAP` plus the write limits. New data-flow row. UNVERIFIED: the spoken loop with a real microphone, echo without headphones, and Aura-2 audio in the browser. |
+| 4.2 Hostile Q&A drill | done | "Take questions" on any talk's field notes (highlighted after the final big-day rehearsal): `mode: 'qa'`, tough audience member, 3 questions whose `basedOn` must quote the talk, then notes on each answer. Same page and endpoint as 4.1. UNVERIFIED with a live model and microphone. |
 | 4.3 Upload a real talk | done | `/upload`, `src/upload/recording.ts`. Decoded in the browser to mono 16 kHz; WAV sent straight to Deepgram pre-recorded with a temporary token (docs confirm tokens work for pre-recorded). Same metrics code as live; session `source: 'recording'`, labelled "From a recording". UNVERIFIED: CORS on api.deepgram.com from a real browser, and a real 15-minute file. |
 | 4.4 Before-the-big-day plan | done | Reminder links carry `drill=auto` (the warm-up picks the weakest-skill drill from local data when opened) and the last one `final=1` with a full run plus questions. Google, Outlook and .ics share `reminderEvents`. |
 

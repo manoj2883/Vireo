@@ -12,6 +12,7 @@ import { UploadPage } from '@/pages/UploadPage';
 
 // The live session pulls in the audio worklet and media code; load it only when needed.
 const LivePage = lazy(() => import('@/pages/LivePage').then((m) => ({ default: m.LivePage })));
+const RoleplayPage = lazy(() => import('@/pages/RoleplayPage').then((m) => ({ default: m.RoleplayPage })));
 
 export function AppRoutes() {
   return (
@@ -30,6 +31,14 @@ export function AppRoutes() {
         element={
           <Suspense fallback={<p className="p-8 text-ink-muted">Opening the session</p>}>
             <LivePage />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/roleplay"
+        element={
+          <Suspense fallback={<p className="p-8 text-ink-muted">Finding your partner</p>}>
+            <RoleplayPage />
           </Suspense>
         }
       />

@@ -31,6 +31,8 @@ export function limitsFromEnv(env = process.env) {
     /** Field notes and tightening calls per visitor per hour (each retake makes two). */
     writesPerHour: int(env.WRITES_PER_VISITOR_PER_HOUR, 40),
     writesPerIpPerHour: int(env.WRITES_PER_IP_PER_HOUR, 120),
+    /** Site-wide roleplay and Q&A partner turns per UTC day (a model call plus speech each). 0 turns them off. */
+    dailyRoleplayTurnCap: int(env.DAILY_ROLEPLAY_TURN_CAP, 600),
   };
 }
 
@@ -96,6 +98,12 @@ export function createLimiter({ env = process.env, now = () => Date.now(), redis
       { name: 'writes-ip-hour', max: limits.writesPerIpPerHour, w: make('writes-ip-hour', limits.writesPerIpPerHour, HOUR), key: (v) => v.ip, message: 'Too many field notes requests from this network. Try again later.' },
     ],
   };
+
+  // A partner turn counts against the site's daily roleplay cap and the same write limits as notes.
+  rules.roleplay = [
+    { name: 'roleplay-site-day', max: limits.dailyRoleplayTurnCap, w: make('roleplay-site-day', limits.dailyRoleplayTurnCap, DAY, true), key: () => 'all', message: 'Vireo has reached today’s limit for practice partners. It resets at midnight UTC.' },
+    ...rules.write,
+  ];
 
   return {
     backend,

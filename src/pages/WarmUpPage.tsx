@@ -8,6 +8,7 @@ import { TALK_TYPES, type TalkType } from '@/live/metrics/pace';
 import { DEFAULT_CONFIG, loadConfig, saveConfig, type SessionConfig, type WarmUpPreset } from '@/session/config';
 import { SITUATIONS, situationById, type SituationId } from '@/session/situations';
 import { listSessions, listStories, type StoredStory } from '@/storage/localDb';
+import { DEFAULT_ROLE, MAX_TURNS, MIN_TURNS, ROLE_LABELS, type PartnerRole } from '@/roleplay/conversation';
 import { usePreviewMedia } from '@/components/hud/usePreviewMedia';
 import { DemoResting } from '@/components/DemoResting';
 import { useDemoHealth } from '@/lib/health';
@@ -58,7 +59,7 @@ export function WarmUpPage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const { state: preview, levels } = usePreviewMedia(videoRef);
   const [calibrating, setCalibrating] = useState<'idle' | 'running' | 'done' | 'failed'>(() => (loadConfig()?.calibration ? 'done' : 'idle'));
-  const ids = { source: useId(), question: useId(), prompt: useId(), mode: useId(), audience: useId(), story: useId(), face: useId(), privacy: useId(), calm: useId() };
+  const ids = { source: useId(), question: useId(), prompt: useId(), mode: useId(), audience: useId(), story: useId(), face: useId(), privacy: useId(), calm: useId(), partner: useId(), role: useId(), turns: useId() };
 
   /** Two seconds of looking at the camera: where "eye contact" is for you, and your usual posture. */
   async function calibrateCamera() {
@@ -129,10 +130,12 @@ export function WarmUpPage() {
     if (!canStart) return;
     saveConfig({ ...config, prompt: config.prompt.trim(), context: cleanContext(config.context) });
     if (config.confidenceMode && !config.retake) setBreathing(true);
-    else navigate('/session');
+    else navigate(next);
   }
 
-  if (breathing) return <BreathingWarmUp onDone={() => navigate('/session')} />;
+  /** A partner conversation runs on its own page; everything else is a live session. */
+  const next = config.partner ? '/roleplay' : '/session';
+  if (breathing) return <BreathingWarmUp onDone={() => navigate(next)} />;
 
   const sources: { id: Source; title: string; body: string }[] = [
     ...SITUATIONS.map((x) => ({ id: x.id, title: x.label, body: x.blurb })),
@@ -289,6 +292,57 @@ export function WarmUpPage() {
           )}
 
           <ContextStep value={config.context} onChange={(next) => set('context', next)} />
+
+          <div className="flex flex-col gap-4 rounded-md bg-surface-100 p-[18px]">
+            <label htmlFor={ids.partner} className="flex cursor-pointer items-center justify-between gap-4">
+              <span className="flex flex-col gap-1">
+                <span className="text-lg font-semibold">Practise with a partner</span>
+                <span className="text-[15px] text-ink-muted">A spoken back-and-forth: your partner asks, you answer, and every follow-up builds on what you actually said.</span>
+              </span>
+              <Switch
+                id={ids.partner}
+                checked={Boolean(config.partner)}
+                onCheckedChange={(on) =>
+                  set('partner', on ? { mode: 'roleplay', role: DEFAULT_ROLE[config.situationId ?? ''] ?? 'interviewer', turns: 4 } : undefined)
+                }
+              />
+            </label>
+            {config.partner && (
+              <div className="flex flex-wrap gap-4">
+                <label htmlFor={ids.role} className="flex flex-col gap-1 text-[15px] text-ink-muted">
+                  Partner
+                  <select
+                    id={ids.role}
+                    value={config.partner.role}
+                    onChange={(e) => set('partner', { ...config.partner!, role: e.target.value as PartnerRole })}
+                    className="min-h-11 rounded-md border-0 bg-surface-000 px-3 text-[17px] text-foreground"
+                  >
+                    {(Object.keys(ROLE_LABELS) as PartnerRole[]).map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label htmlFor={ids.turns} className="flex flex-col gap-1 text-[15px] text-ink-muted">
+                  Questions
+                  <select
+                    id={ids.turns}
+                    value={config.partner.turns}
+                    onChange={(e) => set('partner', { ...config.partner!, turns: Number(e.target.value) })}
+                    className="min-h-11 rounded-md border-0 bg-surface-000 px-3 text-[17px] text-foreground"
+                  >
+                    {Array.from({ length: MAX_TURNS - MIN_TURNS + 1 }, (_, i) => MIN_TURNS + i).map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className="m-0 basis-full text-small text-ink-muted">You can end the conversation at any time. Your partner’s questions and your answers go to the field notes model; the questions are spoken by Deepgram’s voice, or your browser’s.</p>
+              </div>
+            )}
+          </div>
 
           <fieldset className="m-0 flex flex-col gap-3.5 border-0 p-0">
             <legend className="mb-3.5 p-0 text-ink-muted">How should Vireo coach you?</legend>

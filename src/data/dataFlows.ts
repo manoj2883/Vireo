@@ -38,6 +38,12 @@ export const DATA_FLOWS: DataFlow[] = [
     goesTo: 'The Vireo server, which sends them to the same field notes provider. The finished story is saved only on this device.',
   },
   {
+    id: 'roleplay',
+    what: 'The partner’s questions so far and the transcript of your answers (for questions after a talk, the talk’s transcript too), your prompt and stated context',
+    when: 'Each turn of “Practise with a partner” or “Take questions”',
+    goesTo: 'The Vireo server, which sends it to the field notes provider for the next question, and sends the question’s text to **Deepgram** to be spoken. If that voice isn’t available, your browser speaks it instead.',
+  },
+  {
     id: 'limits',
     what: 'An anonymous random cookie and your IP address',
     when: 'When a session starts and when notes are written',

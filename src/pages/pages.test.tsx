@@ -402,6 +402,59 @@ describe('Deleting', () => {
   });
 });
 
+describe('Practise with a partner', () => {
+  it('sets up a partner on the warm-up and opens the conversation page', async () => {
+    mockFetch({ ok: true, body: { transcription: { configured: true }, fieldNotes: { configured: true } } });
+    renderAt('/warm-up');
+    fireEvent.click(screen.getByRole('radio', { name: /60-second pitch/i }));
+    fireEvent.click(screen.getByRole('switch', { name: /practise with a partner/i }));
+    expect(screen.getByLabelText('Partner')).toHaveValue('investor');
+    fireEvent.change(screen.getByLabelText('Questions'), { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: /start speaking/i }));
+    expect(JSON.parse(sessionStorage.getItem('vireo-session-config')!).partner).toEqual({ mode: 'roleplay', role: 'investor', turns: 5 });
+    // jsdom has no microphone: the conversation page explains instead of failing silently.
+    expect(await screen.findByRole('alert')).toHaveTextContent(/needs your microphone/i);
+    expect(screen.getByText(/headphones help/i)).toBeInTheDocument();
+  });
+
+  it('shows how each answer addressed its question, and the partner’s questions in the transcript', async () => {
+    const turns = [
+      { question: 'What does your research do?', basedOn: null, askedAtMs: 0, answerStartMs: 300, answerEndMs: 6000 },
+      { question: 'Why does saying no matter?', basedOn: 'say no', askedAtMs: 6100, answerStartMs: 6500, answerEndMs: 12_000 },
+    ];
+    const answers = [{ questionIndex: 1, addressed: 'fully' as const, note: 'You named the goal straight away.', quote: 'teaching ai systems to say no' }];
+    await saveSession(
+      storedSession({
+        roleplay: { mode: 'roleplay', role: 'investor', turns },
+        transcript: [{ speaker: 'coach', text: turns[0].question, startMs: 0 }, ...storedSession().transcript],
+        notesStatus: 'ready',
+        notes: { ...NOTES, answers },
+        tightened: { script: 'x', mainPoint: 'x', status: 'ready' },
+      })
+    );
+    renderAt('/notes/sess_1');
+    const section = await screen.findByRole('region', { name: 'How you answered each question' });
+    const cards = within(section).getAllByTestId('partner-answer');
+    expect(cards[0]).toHaveTextContent('Answered it');
+    expect(cards[0]).toHaveTextContent('teaching ai systems to say no');
+    expect(cards[1]).toHaveTextContent(/No note for this answer/);
+    expect(screen.getByText('Partner asks:', { exact: false })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Take questions' })).toBeNull();
+  });
+
+  it('takes three questions drawn from a talk, and leads with them after the final rehearsal', async () => {
+    await saveSession(storedSession({ config: { ...storedSession().config, takeQuestions: true }, notesStatus: 'ready', notes: NOTES, tightened: { script: 'x', mainPoint: 'x', status: 'ready' } }));
+    renderAt('/notes/sess_1');
+    const qa = await screen.findByRole('region', { name: 'Now take questions, like the real thing' });
+    fireEvent.click(within(qa).getByRole('button', { name: 'Take questions' }));
+    const saved = JSON.parse(sessionStorage.getItem('vireo-session-config')!);
+    expect(saved.partner).toMatchObject({ mode: 'qa', role: 'tough_audience', turns: 3, sourceSessionId: 'sess_1' });
+    expect(saved.partner.source).toContain('teaching ai systems to say no');
+    expect(saved.takeQuestions).toBeUndefined();
+    expect(await screen.findByText(/questions after your talk/i)).toBeInTheDocument();
+  });
+});
+
 describe('Upload a real talk', () => {
   it('transcribes the audio with Deepgram directly, saves it as a session, and labels it from a recording', async () => {
     const words = Array.from({ length: 24 }, (_, i) => ({ word: 'word', punctuated_word: i === 23 ? 'word.' : 'word', start: 0.1 + i * 0.15, end: 0.2 + i * 0.15 }));
@@ -437,7 +490,7 @@ describe('Trust page', () => {
     renderAt('/trust');
     expect(screen.getByRole('heading', { level: 1, name: 'What happens to your voice' })).toBeInTheDocument();
     const leaves = screen.getByRole('region', { name: 'Leaves this device' });
-    for (const name of ['Deepgram', 'Google Gemini', 'Upstash Redis', 'Vercel', 'Google Fonts', 'jsDelivr']) expect(within(leaves).getByText(name)).toBeInTheDocument();
+    for (const name of ['Deepgram', 'Google Gemini', 'Upstash Redis', 'Vercel', 'Google Fonts', 'jsDelivr']) expect(within(leaves).getAllByText(name).length).toBeGreaterThan(0);
     expect(screen.getByRole('region', { name: 'Vireo never' })).toHaveTextContent(/never what you felt/);
     expect(screen.getByRole('region', { name: 'Current accuracy' })).toHaveTextContent(/Not published yet.*at least 10 real recordings/);
     expect(screen.getByRole('link', { name: 'MIT licence' })).toHaveAttribute('href', 'https://github.com/manoj2883/Vireo/blob/main/LICENSE');

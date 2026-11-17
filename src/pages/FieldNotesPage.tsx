@@ -314,7 +314,7 @@ function FieldNotesView({
       {previous && <BeforeAfter before={previous} after={session} />}
 
       {notes && session.segments.length >= MIN_WORDS && (
-        <TightenedAnswer original={session.transcript.map((l) => l.text).join(' ')} tightened={session.tightened} pending={tightenPending} onRetry={onRetryTighten} />
+        <TightenedAnswer original={session.transcript.filter((l) => l.speaker !== 'coach').map((l) => l.text).join(' ')} tightened={session.tightened} pending={tightenPending} onRetry={onRetryTighten} />
       )}
 
       {notes && <LandingLine landing={notes.landing} />}
@@ -407,6 +407,10 @@ function FieldNotesView({
         <Transcript session={session} containerRef={transcriptRef} highlightMs={highlightMs ?? selectedNote?.startMs ?? null} />
       </section>
 
+      {notes && session.roleplay && <PartnerAnswers session={session} notes={notes} />}
+
+      {notes && !session.roleplay && session.segments.length >= MIN_WORDS && <TakeQuestions session={session} highlight={Boolean(session.config.takeQuestions)} />}
+
       {notes && session.config.audience && (
         <section aria-labelledby="aud-h" className="flex flex-col gap-6 rounded-[32px] bg-olive p-8 text-olive-foreground sm:p-14">
           <p id="aud-h" className="m-0 text-[17px] font-semibold">
@@ -463,6 +467,80 @@ function WentWell({ notes }: { notes: FieldNotes }) {
         <p className="m-0 font-display text-[clamp(24px,2.6vw,32px)] leading-[1.2]">You said it out loud, start to finish. That’s the hard part done.</p>
       )}
     </div>
+  );
+}
+
+const ADDRESSED: Record<'fully' | 'partly' | 'not', { label: string; cls: string }> = {
+  fully: { label: 'Answered it', cls: 'bg-paper-olive' },
+  partly: { label: 'Partly answered', cls: 'bg-surface-200' },
+  not: { label: 'Didn’t answer it yet', cls: 'bg-paper-amber' },
+};
+
+/** Roleplay and Q&A: each question, and how well the answer addressed it (quoted, evidence-checked). */
+function PartnerAnswers({ session, notes }: { session: StoredSession; notes: FieldNotes }) {
+  const rp = session.roleplay!;
+  return (
+    <section aria-labelledby="answers-h" className="flex flex-col gap-6">
+      <h2 id="answers-h" className="m-0 font-display text-[44px] font-normal leading-[48px] tracking-[-0.02em]">
+        {rp.mode === 'qa' ? 'How you handled the questions' : 'How you answered each question'}
+      </h2>
+      <ol className="m-0 flex list-none flex-col gap-4 p-0">
+        {rp.turns.map((t, i) => {
+          const a = notes.answers?.find((x) => x.questionIndex === i + 1);
+          return (
+            <li key={t.askedAtMs} className="paper-scope flex flex-col gap-3 rounded-[24px] bg-paper p-[26px] text-paper-foreground" data-testid="partner-answer">
+              <span className="text-small opacity-75">
+                Question {i + 1}, at {clock(t.askedAtMs)}
+              </span>
+              <span className="font-display text-note-title">{t.question}</span>
+              {a ? (
+                <>
+                  <span className={cn('self-start rounded-pill px-3 py-1 text-label', ADDRESSED[a.addressed].cls)}>{ADDRESSED[a.addressed].label}</span>
+                  <span className="text-body">{a.note}</span>
+                  {a.quote && <span className="rounded-md bg-surface-200/60 px-4 py-3 text-[16px] leading-[25px] dark:bg-surface-000/10">“{a.quote}”</span>}
+                </>
+              ) : (
+                <span className="text-small opacity-75">No note for this answer: either too little was heard, or Vireo couldn’t back a note with your exact words.</span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+/** "Take questions": three tough but fair questions drawn from this talk, answered out loud. */
+function TakeQuestions({ session, highlight }: { session: StoredSession; highlight: boolean }) {
+  const navigate = useNavigate();
+  function start() {
+    const source = session.transcript
+      .filter((l) => l.speaker !== 'coach')
+      .map((l) => l.text)
+      .join('\n');
+    const config: SessionConfig = {
+      ...session.config,
+      parentSessionId: undefined,
+      retake: undefined,
+      takeQuestions: undefined,
+      drill: undefined,
+      partner: { mode: 'qa', role: 'tough_audience', turns: 3, source, sourceSessionId: session.id },
+    };
+    saveConfig(config);
+    navigate('/roleplay');
+  }
+  return (
+    <section aria-labelledby="qa-h" className={cn('flex flex-wrap items-center justify-between gap-6 rounded-lg p-7 sm:p-10', highlight ? 'paper-scope bg-paper text-paper-foreground' : 'bg-surface-100')}>
+      <div className="flex max-w-[640px] flex-col gap-2">
+        <h2 id="qa-h" className="m-0 font-display text-[clamp(28px,3vw,40px)] font-normal leading-tight">
+          {highlight ? 'Now take questions, like the real thing' : 'Take questions'}
+        </h2>
+        <p className="m-0 text-body opacity-85">Three tough but fair questions drawn from what you just said, asked out loud one at a time. Then short notes on each answer.</p>
+      </div>
+      <Button size="lg" onClick={start} className={highlight ? 'bg-paper-foreground text-paper hover:bg-paper-foreground/90' : undefined}>
+        Take questions
+      </Button>
+    </section>
   );
 }
 
@@ -651,11 +729,13 @@ interface TranscriptLineView {
   startMs: number;
   words: WordSegment[];
   pauseBeforeMs: number;
+  /** A partner's question in a roleplay. */
+  partner?: string;
 }
 
 function linesFor(session: StoredSession): TranscriptLineView[] {
   const starts = session.transcript.map((l) => l.startMs);
-  const lines: TranscriptLineView[] = starts.map((startMs) => ({ startMs, words: [], pauseBeforeMs: 0 }));
+  const lines: TranscriptLineView[] = session.transcript.map((l) => ({ startMs: l.startMs, words: [], pauseBeforeMs: 0, partner: l.speaker === 'coach' ? l.text : undefined }));
   let li = 0;
   for (const w of session.segments) {
     while (li + 1 < starts.length && w.startMs >= starts[li + 1] - 1) li++;
@@ -668,7 +748,7 @@ function linesFor(session: StoredSession): TranscriptLineView[] {
     const pause = session.pauses.find((p) => p.endMs !== undefined && p.startMs >= prevEnd - 50 && p.startMs <= line.startMs);
     if (pause) line.pauseBeforeMs = (pause.endMs ?? pause.startMs) - pause.startMs;
   });
-  return lines.filter((l) => l.words.length);
+  return lines.filter((l) => l.words.length || l.partner);
 }
 
 function Transcript({
@@ -702,6 +782,12 @@ function Transcript({
               className={cn('grid grid-cols-[56px_1fr] gap-4 border-t border-line/60 px-2 py-3 transition-colors', i === active && 'rounded-md border-transparent bg-surface-100')}
             >
               <span className="pt-0.5 text-small text-ink-muted">{clock(line.startMs)}</span>
+              {line.partner ? (
+                <p className="m-0 font-display text-[19px] italic text-ink-muted">
+                  <span className="sr-only">Partner asks: </span>
+                  {line.partner}
+                </p>
+              ) : (
               <p className="m-0 text-body">
                 {line.words.map((w, k) => (
                   <span key={k} className={w.kind === 'filler' ? 'italic text-amber' : undefined}>
@@ -709,6 +795,7 @@ function Transcript({
                   </span>
                 ))}
               </p>
+              )}
             </div>
           </div>
         ))}

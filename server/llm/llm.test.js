@@ -27,6 +27,7 @@ const VALID = {
   drills: [{ title: 'The full stop', instructions: 'State the result, breathe, explain.', minutes: 4 }],
   storyBeats: { present: [], missing: [{ kind: 'hook', suggestion: 'Open with the result.' }] },
   landing: { hasClearClose: true, suggestions: [] },
+  answers: [],
 };
 
 function fakeProvider(replies) {
