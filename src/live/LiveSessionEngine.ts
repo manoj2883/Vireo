@@ -65,7 +65,8 @@ export interface LiveSnapshot {
 }
 
 export interface TranscriptLine {
-  speaker: 'user';
+  /** Partner questions in a roleplay are 'coach' lines; notes never quote them. */
+  speaker: 'user' | 'coach';
   text: string;
   startMs: number;
 }

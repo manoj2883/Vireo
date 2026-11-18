@@ -2,6 +2,7 @@ import type { FieldNotes } from '@/types/fieldNotes';
 import type { StoredSession, StoredStory } from '@/storage/localDb';
 import { TALK_TYPES } from '@/live/metrics/pace';
 import { situationById } from './situations';
+import { ROLE_LABELS } from '@/roleplay/conversation';
 import type { PersonalBaseline } from '@/lib/personalBest';
 import type { SkillId } from '@/lib/skills';
 
@@ -36,6 +37,13 @@ export async function requestFieldNotes(session: StoredSession, story?: StoredSt
         masteredSkills: memory.masteredSkills?.length ? memory.masteredSkills : undefined,
         personalBest: memory.personalBest ?? undefined,
         confidenceMode: session.config.confidenceMode || undefined,
+        roleplay: session.roleplay
+          ? {
+              mode: session.roleplay.mode,
+              roleLabel: ROLE_LABELS[session.roleplay.role],
+              questions: session.roleplay.turns.map((t) => ({ question: t.question, answerStartMs: t.answerStartMs, answerEndMs: t.answerEndMs })),
+            }
+          : undefined,
       },
     }),
   });

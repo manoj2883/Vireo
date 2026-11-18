@@ -18,6 +18,7 @@ const VALID = {
   drills: [{ title: 'd', instructions: 'i', minutes: 3 }],
   storyBeats: { present: [], missing: [{ kind: 'hook', suggestion: 'Open with the result.' }] },
   landing: { hasClearClose: true, suggestions: [] },
+  answers: [],
 };
 
 const BUSY_BODY = '{"error":{"code":503,"message":"This model is currently experiencing high demand.","status":"UNAVAILABLE"}}';

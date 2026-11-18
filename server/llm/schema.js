@@ -114,6 +114,18 @@ export const FieldNotesSchema = z.object({
   }),
   drills: z.array(DrillSchema).min(1),
   storyBeats: StoryBeatsSchema,
+  /** Roleplay and Q&A only: how well each answer addressed its question. Empty otherwise. */
+  answers: z
+    .array(
+      z.object({
+        questionIndex: z.number().int().min(1),
+        addressed: z.enum(['fully', 'partly', 'not']),
+        note: z.string().min(1),
+        /** Exact words from that answer; checked like a note's quote. */
+        quote: z.string(),
+      })
+    )
+    .max(6),
   landing: LandingSchema,
   /** Up to three lines to say more naturally; empty when none qualify. */
   naturalPhrasing: z.array(NaturalPhrasingSchema).max(3).optional(),

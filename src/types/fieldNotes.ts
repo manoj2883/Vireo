@@ -76,6 +76,9 @@ export interface FieldNotes {
   /** Whether the answer lands; if not, up to two closing lines of 12 words or fewer, from the speaker's words. */
   landing?: { hasClearClose: boolean; suggestions: string[] };
   droppedBeats?: number;
+  /** Roleplay and Q&A: how well each answer addressed its question, quoted. */
+  answers?: { questionIndex: number; addressed: 'fully' | 'partly' | 'not'; note: string; quote: string }[];
+  droppedAnswers?: number;
   droppedLandingLines?: number;
   /** "Say it more naturally": up to three lines, each quoted from the transcript. Absent in older notes. */
   naturalPhrasing?: NaturalPhrasing[];

@@ -22,8 +22,8 @@ export const DATA_FLOWS: DataFlow[] = [
   {
     id: 'transcription',
     what: 'Microphone audio (16 kHz), plus keyterms: distinctive words from your question and story, and your “Words Vireo should know”',
-    when: 'During a live session',
-    goesTo: '**Deepgram**, directly from your browser, for transcription. The Vireo server only issues the short-lived token that opens the connection.',
+    when: 'During a live session, and when you upload a recording (its audio only, taken out of the file on this device)',
+    goesTo: '**Deepgram**, directly from your browser, for transcription. The Vireo server only issues the short-lived token that opens the connection. An uploaded video file never leaves this device.',
   },
   {
     id: 'field-notes',
@@ -36,6 +36,12 @@ export const DATA_FLOWS: DataFlow[] = [
     what: 'Your answers in the Story Bank interview, and the story’s working title',
     when: 'When you use “Build a story with me”, one answer at a time',
     goesTo: 'The Vireo server, which sends them to the same field notes provider. The finished story is saved only on this device.',
+  },
+  {
+    id: 'roleplay',
+    what: 'The partner’s questions so far and the transcript of your answers (for questions after a talk, the talk’s transcript too), your prompt and stated context',
+    when: 'Each turn of “Practise with a partner” or “Take questions”',
+    goesTo: 'The Vireo server, which sends it to the field notes provider for the next question, and sends the question’s text to **Deepgram** to be spoken. If that voice isn’t available, your browser speaks it instead.',
   },
   {
     id: 'limits',

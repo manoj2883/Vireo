@@ -5,6 +5,11 @@
  */
 
 export const MIN_DAYS_AHEAD = 4;
+
+/** In a reminder link: "pick the drill for my weakest skill when I open this". */
+export const AUTO_DRILL = 'auto';
+/** The last rehearsal is the real thing: start to finish, then questions. */
+export const FULL_RUN_DRILL = 'Full run, start to finish, then take three tough questions';
 export const MAX_DAYS_AHEAD = 365;
 
 /** "2026-10-14" from a Date, in local time. */
@@ -49,11 +54,12 @@ export interface ReminderInput {
   now?: Date;
 }
 
-export function warmUpLink(origin: string, prompt: string, situationId: string | undefined, drill: string | undefined): string {
+export function warmUpLink(origin: string, prompt: string, situationId: string | undefined, drill: string | undefined, final = false): string {
   const params = new URLSearchParams();
   params.set('prompt', prompt.slice(0, 300));
   if (situationId) params.set('situation', situationId);
   if (drill) params.set('drill', drill.slice(0, 300));
+  if (final) params.set('final', '1');
   return `${origin.replace(/\/$/, '')}/warm-up?${params.toString()}`;
 }
 
@@ -110,14 +116,26 @@ export function shortDay(day: string): string {
   return `${WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()]} ${d} ${MONTHS[m - 1]}`;
 }
 
+/**
+ * The rehearsal plan. Every rehearsal but the last opens with the drill for the speaker's weakest
+ * skill on that day (the link says "auto"; the warm-up picks it from local data when opened, since a
+ * calendar event can't know). The last is a full run with Q&A. `input.drills` name a fallback.
+ */
 export function reminderEvents(input: ReminderInput): ReminderEvent[] {
   const shortPrompt = input.prompt.length > 60 ? `${input.prompt.slice(0, 57)}...` : input.prompt;
-  return rehearsalDays(input.today, input.eventDay).map((day, i) => {
-    const drill = input.drills.length ? input.drills[i % input.drills.length] : undefined;
-    const link = warmUpLink(input.origin, input.prompt, input.situationId, drill);
+  const days = rehearsalDays(input.today, input.eventDay);
+  return days.map((day, i) => {
+    const final = i === days.length - 1;
+    const drill = final ? FULL_RUN_DRILL : AUTO_DRILL;
+    const fallback = input.drills.length ? input.drills[i % input.drills.length] : undefined;
+    const link = warmUpLink(input.origin, input.prompt, input.situationId, drill, final);
     const left = daysBetween(day, input.eventDay);
-    const description = [`Rehearsal ${i + 1} of 3, ${left} ${left === 1 ? 'day' : 'days'} before the real thing.`, drill ? `Today's drill: ${drill}` : '', `Open Vireo: ${link}`].filter(Boolean).join('\n');
-    return { day, drill, title: `Vireo rehearsal: ${shortPrompt}`, description, link, label: `${shortDay(day)} — ${drill ?? `Rehearsal ${i + 1}`}` };
+    const today = final
+      ? `Today: ${FULL_RUN_DRILL.charAt(0).toLowerCase()}${FULL_RUN_DRILL.slice(1)}.`
+      : `Today's drill: the one for your weakest skill on the day. Vireo picks it from your sessions when you open the link${fallback ? ` (last time it was "${fallback}")` : ''}.`;
+    const description = [`Rehearsal ${i + 1} of ${days.length}, ${left} ${left === 1 ? 'day' : 'days'} before the real thing.`, today, `Open Vireo: ${link}`].join('\n');
+    const label = `${shortDay(day)} — ${final ? 'Full run with questions' : 'Drill for your weakest skill'}`;
+    return { day, drill, title: `Vireo rehearsal: ${shortPrompt}`, description, link, label };
   });
 }
 
